@@ -93,6 +93,16 @@ class Settings(BaseSettings):
     rate_limit_requests: int = 120
     rate_limit_window_seconds: int = 60
 
+    # Slack Incoming Webhook — OFF by default; never put PHI in Slack messages
+    slack_webhook_url: str = Field(
+        default="",
+        validation_alias=AliasChoices("SLACK_WEBHOOK_URL"),
+    )
+    slack_enabled: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("SLACK_ENABLED"),
+    )
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

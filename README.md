@@ -11,7 +11,7 @@ Production-oriented, HIPAA-ready SaaS scaffold (FastAPI · React · Terraform �
 | `apps/android/` | Android client (same API/auth) |
 | `apps/ios/` | Apple/iOS client (same API/auth) |
 | `infra/terraform/` | AWS IaC (ECS, ALB, Aurora/RDS, Redis, KMS, etc.) — **never apply from CI** |
-| `docs/` | HIPAA checklist, assessment-day runbook |
+| `docs/` | HIPAA checklist, assessment-day runbook, team management / workstreams |
 | `docker-compose.yml` | Local parity: api, db, redis, frontend |
 
 ## Quick start (local)
@@ -60,6 +60,9 @@ GitHub Actions (`.github/workflows/`):
 - [HIPAA engineering checklist](docs/hipaa-checklist.md) — required controls before calling anything complete (not a certification claim)
 - [Assessment-day runbook](docs/assessment-day-runbook.md) — parallel streams, health gates, demo order
 - [Load balancing & scaling](docs/load-balancing.md) — ALB fan-out, API vs worker autoscaling
+- [Team management + Slack](docs/team-management.md) — org/team roles, JWT APIs, webhook vs Slack app
+- [Workstreams](docs/workstreams.md) — assign API / UI / infra / mobile / AI to developers
+- [Contributing](CONTRIBUTING.md) — PR ownership and CODEOWNERS expectations
 
 ## Explicit non-goals (prep)
 

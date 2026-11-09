@@ -40,7 +40,7 @@ Optional plan dry-run (still no apply; requires AWS creds and filled tfvars — 
 | ECS Fargate | `modules/ecs` | API + worker; desired_count + App Autoscaling (CPU/mem/requests) |
 | Aurora/RDS Postgres | `modules/rds` | Private; storage encrypted; SSL |
 | ElastiCache Redis | `modules/redis` | Private; at-rest + in-transit encryption |
-| Secrets Manager | `modules/secrets` | App/DB/Redis secret shells (no values committed) |
+| Secrets Manager | `modules/secrets` | App/DB/Redis secret shells (no values committed); app JSON includes `SLACK_WEBHOOK_URL` / `SLACK_ENABLED=false` placeholders for optional Incoming Webhooks |
 | CloudWatch | `modules/cloudwatch` | Log groups + retention |
 | WAF | `modules/waf` | Placeholder association to ALB |
 | IAM | `modules/iam` | Execution + task roles; Rekognition + SES send on task role |

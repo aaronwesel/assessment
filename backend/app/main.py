@@ -30,6 +30,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         google_configured=settings.google_configured,
         microsoft_configured=settings.microsoft_configured,
         ses_enabled=settings.ses_enabled,
+        slack_enabled=settings.slack_enabled,
     )
     get_redis()
     # Local/test: ensure schema without requiring a prior alembic upgrade.

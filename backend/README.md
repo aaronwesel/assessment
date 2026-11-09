@@ -1,6 +1,6 @@
 # Backend (FastAPI)
 
-HIPAA-minded FastAPI API: JWT access/refresh (+ Redis session/blacklist), password register/login, Google One Tap + Microsoft MSAL ID-token exchange, RBAC, Redis client, DeepSeek (off) + Rekognition stubs, Amazon SES alert client (off) with PHI-free templates, Alembic, LB-oriented health/readiness, `X-Request-ID` middleware, optional Redis rate limit.
+HIPAA-minded FastAPI API: JWT access/refresh (+ Redis session/blacklist), password register/login, Google One Tap + Microsoft MSAL ID-token exchange, RBAC, team management stubs (org/team/membership), Redis client, DeepSeek (off) + Rekognition stubs, Amazon SES alert client (off) with PHI-free templates, optional Slack Incoming Webhook (off), Alembic, LB-oriented health/readiness, `X-Request-ID` middleware, optional Redis rate limit.
 
 ## Quick start
 
@@ -27,8 +27,11 @@ Local/test environments call `init_db()` on startup. Production should run `alem
 | POST | `/auth/google/onetap` | Google ID token → JWT (google-auth) |
 | POST | `/auth/microsoft/onetap` | Microsoft ID token → JWT (JWKS) |
 | GET | `/auth/me` | Bearer access token |
+| POST | `/teams` | Create team (+ optional org); JWT; creator becomes owner |
+| GET | `/teams` | List teams for current subject; JWT |
+| POST | `/teams/{team_id}/invites` | Invite by email (stub membership); JWT |
 
-Tokens use `jti`; Redis tracks sessions and supports blacklist. Logs never include email, passwords, or raw tokens.
+Tokens use `jti`; Redis tracks sessions and supports blacklist. Logs never include email, passwords, or raw tokens. Team + Slack details: [docs/team-management.md](../docs/team-management.md).
 
 ## Tests
 
@@ -36,7 +39,7 @@ Tokens use `jti`; Redis tracks sessions and supports blacklist. Logs never inclu
 pytest -q
 ```
 
-Google/Microsoft verifiers are unit-tested with mocked google-auth / JWKS. SES alert tests live in `tests/test_ses_alerts.py`.
+Google/Microsoft verifiers are unit-tested with mocked google-auth / JWKS. SES alert tests live in `tests/test_ses_alerts.py`. Team + Slack tests: `tests/test_teams.py`, `tests/test_slack.py`.
 
 ## Load balancer probes
 
@@ -49,6 +52,7 @@ Responses include `X-Request-ID`. Optional rate limit: `RATE_LIMIT_ENABLED=true`
 
 ## Notes
 
-- `DEEPSEEK_ENABLED`, `REKOGNITION_ENABLED`, `SES_ENABLED`, and `LOGIN_ALERT_EMAIL_ENABLED` default to `false`.
+- `DEEPSEEK_ENABLED`, `REKOGNITION_ENABLED`, `SES_ENABLED`, `LOGIN_ALERT_EMAIL_ENABLED`, and `SLACK_ENABLED` default to `false`.
 - SES alert templates forbid PHI in bodies (`app/alerts/templates.py`).
+- Slack webhook payloads use opaque ids only (`app/clients/slack.py`); never post invite emails.
 - Do not log PHI; see `app/core/logging.py`.

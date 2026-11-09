@@ -17,6 +17,7 @@ Use as acceptance criteria during prep and assessment day. Infra stream owns Ter
 | Audit logging | Structured events (who / what / when / tenant); CloudWatch or immutable bucket | TODO |
 | No PHI in logs | Redact bodies; forbid PHI in prompts/logs; DeepSeek sanitized / feature-gated | Flag off by default |
 | No PHI in email | SES alert templates forbid PHI/PII in bodies; login alerts omit account identifiers | `SES_ENABLED` / `LOGIN_ALERT_EMAIL_ENABLED` off by default |
+| No PHI in Slack | Incoming webhook payloads use opaque ids/event codes only; invite emails never posted | `SLACK_ENABLED=false` by default |
 | Backups | Automated backups + PITR on Aurora/RDS; restore drill in runbook | Runbook noted |
 | Least privilege IAM | Task roles scoped per service; no `*` on data stores | Terraform sibling |
 | WAF / abuse | WAF placeholder + Redis rate limits; SSRF deny-lists on workers | TODO |

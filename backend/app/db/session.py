@@ -27,6 +27,8 @@ def init_db() -> None:
     """Create tables for local/test when migrations have not run yet."""
     # Import models so metadata is populated.
     from app.models import account_link as _account_link  # noqa: F401
+    from app.models import organization as _organization  # noqa: F401
+    from app.models import team as _team  # noqa: F401
     from app.models import user as _user  # noqa: F401
 
     SQLModel.metadata.create_all(engine)
