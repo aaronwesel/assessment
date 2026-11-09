@@ -1,4 +1,23 @@
-"""Application settings loaded from environment (no secrets in code)."""
+"""
+Application settings loaded from environment / `.env` (no secrets in source).
+
+Why pydantic-settings: a single typed surface for local Compose, ECS task env,
+and Secrets Manager–injected values. AliasChoices accept both short and
+`*_OAUTH_*` names so Compose and AWS wiring stay interchangeable.
+
+Auth / JWT:
+- `secret_key` signs access + refresh tokens (HS256 by default).
+- Short access TTL + longer refresh TTL matches Redis session keys in security.py.
+
+Load balancing:
+- Optional Redis rate limits (`RATE_LIMIT_*`) stay consistent across ECS tasks
+  when ALB sticky sessions are OFF.
+
+HIPAA / safety defaults:
+- DeepSeek, Rekognition, SES, and Slack are OFF unless explicitly enabled.
+- Login-alert recipients are ops mailboxes, not end-user PHI destinations.
+- Slack webhook bodies must stay PHI-free (opaque ids + event codes only).
+"""
 
 from functools import lru_cache
 from typing import Literal
@@ -35,6 +54,27 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("REFRESH_TOKEN_EXPIRE_DAYS", "JWT_REFRESH_TTL_DAYS"),
     )
     jwt_algorithm: str = "HS256"
+
+    # Field-level Fernet key (base64 url-safe 32-byte or any secret we derive from).
+    # Production: set via Secrets Manager. Empty → derive from secret_key (local/test only).
+    field_encryption_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("FIELD_ENCRYPTION_KEY", "FERNET_KEY"),
+    )
+
+    # Login abuse controls (Redis). Tunable without code changes.
+    login_max_failures: int = Field(default=5, validation_alias="LOGIN_MAX_FAILURES")
+    login_failure_window_seconds: int = Field(
+        default=900,
+        validation_alias="LOGIN_FAILURE_WINDOW_SECONDS",
+    )
+    login_lockout_seconds: int = Field(
+        default=900,
+        validation_alias="LOGIN_LOCKOUT_SECONDS",
+    )
+
+    # MFA: when true, password users with mfa_enabled must send totp_code on login.
+    mfa_issuer: str = Field(default="Assessment", validation_alias="MFA_ISSUER")
 
     database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/assessment"
     redis_url: str = "redis://localhost:6379/0"
@@ -88,6 +128,21 @@ class Settings(BaseSettings):
     login_alert_email_enabled: bool = False
     login_alert_to_email: str = ""  # comma-separated ops mailboxes; not end-user PHI
 
+    # Optional Redis-backed rate limit (cross-task; sticky sessions are OFF)
+    rate_limit_enabled: bool = False
+    rate_limit_requests: int = 120
+    rate_limit_window_seconds: int = 60
+
+    # Slack Incoming Webhook — OFF by default; never put PHI in Slack messages
+    slack_webhook_url: str = Field(
+        default="",
+        validation_alias=AliasChoices("SLACK_WEBHOOK_URL"),
+    )
+    slack_enabled: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("SLACK_ENABLED"),
+    )
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
@@ -107,4 +162,5 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
+    """Cached settings singleton — process env is fixed for the worker lifetime."""
     return Settings()

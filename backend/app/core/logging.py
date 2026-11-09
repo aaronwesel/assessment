@@ -1,4 +1,14 @@
-"""Structured logging helpers. HIPAA: never log PHI or request bodies with PII/PHI."""
+"""
+Structured logging helpers with HIPAA-minded redaction.
+
+Rules of thumb for this codebase:
+- Log event *codes* and booleans (e.g. `password_login`, `ses_enabled=true`).
+- Never log request bodies, ID tokens, passwords, emails, SSNs, or free-text PHI.
+- Prefer `log_event(...)` over raw `logger.info` with kwargs that may be sensitive.
+
+`sanitize_extra` drops known sensitive keys and regex-redacts emails/SSN-like
+strings that slip into string values.
+"""
 
 from __future__ import annotations
 
@@ -31,6 +41,18 @@ _SENSITIVE_KEYS = frozenset(
         "prompt",
         "content",
         "body",
+        # MFA / crypto — never log secrets, codes, or recovery material.
+        "mfa_secret",
+        "totp",
+        "totp_code",
+        "otp",
+        "otpauth",
+        "backup_code",
+        "backup_codes",
+        "secret",
+        "field_encryption_key",
+        "fernet_key",
+        "cookie",
     }
 )
 
@@ -59,6 +81,7 @@ def sanitize_extra(extra: dict[str, Any] | None) -> dict[str, Any]:
 
 
 def get_logger(name: str) -> logging.Logger:
+    """Module logger with a simple stream handler (CloudWatch picks up stdout)."""
     logger = logging.getLogger(name)
     if not logger.handlers:
         handler = logging.StreamHandler()

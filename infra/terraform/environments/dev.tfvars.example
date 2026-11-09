@@ -14,12 +14,16 @@ acm_certificate_arn = ""
 api_image_tag    = "latest"
 worker_image_tag = "latest"
 
-api_cpu            = 512
-api_memory         = 1024
-api_desired_count  = 1
-worker_cpu         = 512
-worker_memory      = 1024
+api_cpu              = 512
+api_memory           = 1024
+api_desired_count    = 1
+api_min_capacity     = 1
+api_max_capacity     = 4
+worker_cpu           = 512
+worker_memory        = 1024
 worker_desired_count = 1
+worker_min_capacity  = 1
+worker_max_capacity  = 3
 
 db_engine_version = "15.4"
 db_instance_class = "db.t4g.medium"

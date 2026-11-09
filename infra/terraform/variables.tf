@@ -70,15 +70,69 @@ variable "worker_memory" {
 }
 
 variable "api_desired_count" {
-  description = "Desired ECS tasks for API"
+  description = "Bootstrap DesiredCount for API ECS service (autoscaling owns runtime)"
   type        = number
   default     = 2
 }
 
 variable "worker_desired_count" {
-  description = "Desired ECS tasks for worker"
+  description = "Bootstrap DesiredCount for worker ECS service (autoscaling owns runtime)"
   type        = number
   default     = 1
+}
+
+variable "api_min_capacity" {
+  description = "API autoscaling minimum (≥2 for multi-AZ prod)"
+  type        = number
+  default     = 2
+}
+
+variable "api_max_capacity" {
+  description = "API autoscaling maximum"
+  type        = number
+  default     = 8
+}
+
+variable "worker_min_capacity" {
+  description = "Worker autoscaling minimum"
+  type        = number
+  default     = 1
+}
+
+variable "worker_max_capacity" {
+  description = "Worker autoscaling maximum"
+  type        = number
+  default     = 6
+}
+
+variable "api_cpu_target_percent" {
+  description = "API target tracking CPU utilization %"
+  type        = number
+  default     = 60
+}
+
+variable "api_memory_target_percent" {
+  description = "API target tracking memory utilization %"
+  type        = number
+  default     = 70
+}
+
+variable "api_requests_per_target" {
+  description = "ALB RequestCountPerTarget target for API scale-out"
+  type        = number
+  default     = 1000
+}
+
+variable "worker_cpu_target_percent" {
+  description = "Worker target tracking CPU utilization %"
+  type        = number
+  default     = 65
+}
+
+variable "worker_memory_target_percent" {
+  description = "Worker target tracking memory utilization %"
+  type        = number
+  default     = 75
 }
 
 variable "db_engine_version" {

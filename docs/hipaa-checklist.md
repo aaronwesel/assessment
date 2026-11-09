@@ -17,9 +17,12 @@ Use as acceptance criteria during prep and assessment day. Infra stream owns Ter
 | Audit logging | Structured events (who / what / when / tenant); CloudWatch or immutable bucket | TODO |
 | No PHI in logs | Redact bodies; forbid PHI in prompts/logs; DeepSeek sanitized / feature-gated | Flag off by default |
 | No PHI in email | SES alert templates forbid PHI/PII in bodies; login alerts omit account identifiers | `SES_ENABLED` / `LOGIN_ALERT_EMAIL_ENABLED` off by default |
+| No PHI in Slack | Incoming webhook payloads use opaque ids/event codes only; invite emails never posted | `SLACK_ENABLED=false` by default |
 | Backups | Automated backups + PITR on Aurora/RDS; restore drill in runbook | Runbook noted |
 | Least privilege IAM | Task roles scoped per service; no `*` on data stores | Terraform sibling |
-| WAF / abuse | WAF placeholder + Redis rate limits; SSRF deny-lists on workers | TODO |
+| WAF / abuse | WAF placeholder + Redis rate limits; SSRF deny-lists on workers | LB Redis rate-limit middleware + login lockout stubs |
+| MFA | TOTP enroll/verify; backup codes; require flag on login | See `docs/security.md` |
+| Password policy | bcrypt + complexity + common-password denylist | See `docs/security.md` |
 | BAA-minded services | Prefer AWS services eligible for BAA; document AI vendor BAA gap — DeepSeek off or non-PHI only until cleared | Documented |
 | Migrations | Run as deploy step, not on API boot in prod | Convention |
 | Access | No open admin; break-glass documented | Runbook |

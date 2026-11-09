@@ -1,4 +1,10 @@
-"""Amazon Rekognition client stub via boto3. Prefer IAM task role in ECS."""
+"""
+Amazon Rekognition client stub via boto3. Prefer IAM task role in ECS.
+
+Images and derived labels can be PHI/PII — keep `REKOGNITION_ENABLED=false`
+until assessment flows define retention, encryption, and logging rules.
+Never log image bytes or recognition results that could identify a person.
+"""
 
 from __future__ import annotations
 

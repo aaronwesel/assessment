@@ -1,4 +1,15 @@
-"""RBAC role enum and FastAPI dependency stubs."""
+"""
+RBAC role enum and FastAPI dependencies for JWT-backed authorization.
+
+Flow:
+1. `HTTPBearer` extracts the Authorization header (optional → 401 if missing).
+2. `decode_token` verifies JWT signature, type=access, and Redis blacklist.
+3. `AuthContext` exposes opaque `subject` + role set (no PHI in the context object).
+4. `require_role(...)` returns a dependency that enforces least privilege (403).
+
+Roles live in the access token claims so edge checks stay DB-free; refresh
+reloads roles from the user row when tokens rotate.
+"""
 
 from __future__ import annotations
 
@@ -36,6 +47,7 @@ async def get_current_auth(
         Depends(bearer_scheme),
     ],
 ) -> AuthContext:
+    """Resolve the caller from a Bearer access token or raise 401."""
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

@@ -1,8 +1,10 @@
 """
-Alert email templates — PHI forbidden in body by default.
+Alert email templates for Amazon SES — PHI forbidden in body by default.
 
-Safe fields only: event type, UTC timestamp, coarse context codes.
-Do not put names, emails, MRNs, diagnoses, or free-text user content in bodies.
+Used by login/system alert hooks (`app.alerts.login_alert`). Safe fields only:
+event type, UTC timestamp, coarse context codes. Do not put names, emails,
+MRNs, diagnoses, or free-text user content in bodies — `assert_no_phi` guards
+rendered copy before send.
 """
 
 from __future__ import annotations

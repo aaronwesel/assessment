@@ -1,3 +1,9 @@
+/**
+ * Email/password register + login against FastAPI JWT endpoints.
+ *
+ * Calls `/auth/register` or `/auth/login`, then AuthContext.loginWithTokens.
+ * Client-side length checks are UX only — server enforces min password length.
+ */
 import { useState, type FormEvent } from 'react'
 import { loginPassword, registerPassword } from '../api/auth'
 import { useAuth } from '../auth/AuthContext'
@@ -8,9 +14,11 @@ export function PasswordForm() {
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [totpCode, setTotpCode] = useState('')
   const [fullName, setFullName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [mfaNeeded, setMfaNeeded] = useState(false)
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -21,8 +29,8 @@ export function PasswordForm() {
       setError('Enter email and password.')
       return
     }
-    if (mode === 'register' && password.length < 8) {
-      setError('Password must be at least 8 characters.')
+    if (mode === 'register' && password.length < 12) {
+      setError('Password must be at least 12 characters with upper, lower, digit, and special.')
       return
     }
 
@@ -35,10 +43,21 @@ export function PasswordForm() {
               password,
               fullName: fullName.trim() || undefined,
             })
-          : await loginPassword({ email: trimmed, password })
+          : await loginPassword({
+              email: trimmed,
+              password,
+              totpCode: totpCode.trim() || undefined,
+            })
       await loginWithTokens(tokens, 'password')
+      setMfaNeeded(false)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sign-in failed')
+      const message = err instanceof Error ? err.message : 'Sign-in failed'
+      if (message === 'mfa_required') {
+        setMfaNeeded(true)
+        setError('Enter your authenticator code to finish sign-in.')
+      } else {
+        setError(message)
+      }
     } finally {
       setBusy(false)
     }
@@ -101,6 +120,20 @@ export function PasswordForm() {
           placeholder="••••••••"
         />
       </label>
+      {mode === 'login' && mfaNeeded ? (
+        <label className="field">
+          <span>Authenticator code</span>
+          <input
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            name="totp"
+            value={totpCode}
+            onChange={(e) => setTotpCode(e.target.value)}
+            placeholder="6-digit code"
+            maxLength={16}
+          />
+        </label>
+      ) : null}
       {error ? <p className="form-error">{error}</p> : null}
       <button type="submit" className="btn btn-primary" disabled={busy}>
         {busy ? 'Please wait…' : mode === 'register' ? 'Create account' : 'Sign in'}
