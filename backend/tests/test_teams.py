@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 def _register_and_token(client: TestClient, email: str = "team-owner@example.com") -> str:
     response = client.post(
         "/api/v1/auth/register",
-        json={"email": email, "password": "securepass1", "full_name": "Team Owner"},
+        json={"email": email, "password": "SecurePass1!x", "full_name": "Team Owner"},
     )
     assert response.status_code == 201
     return response.json()["access_token"]
