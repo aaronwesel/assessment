@@ -39,14 +39,32 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/assessment"
     redis_url: str = "redis://localhost:6379/0"
 
-    # Google Identity Services (One Tap)
-    google_client_id: str = ""
-    google_client_secret: str = ""
+    # Google Identity Services (One Tap) — accept GOOGLE_* and GOOGLE_OAUTH_* names
+    google_client_id: str = Field(
+        default="",
+        validation_alias=AliasChoices("GOOGLE_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_ID"),
+    )
+    google_client_secret: str = Field(
+        default="",
+        validation_alias=AliasChoices("GOOGLE_CLIENT_SECRET", "GOOGLE_OAUTH_CLIENT_SECRET"),
+    )
 
     # Microsoft Entra / MSAL (One Tap)
-    microsoft_client_id: str = ""
-    microsoft_client_secret: str = ""
-    microsoft_tenant_id: str = "common"
+    microsoft_client_id: str = Field(
+        default="",
+        validation_alias=AliasChoices("MICROSOFT_CLIENT_ID", "MICROSOFT_OAUTH_CLIENT_ID"),
+    )
+    microsoft_client_secret: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "MICROSOFT_CLIENT_SECRET",
+            "MICROSOFT_OAUTH_CLIENT_SECRET",
+        ),
+    )
+    microsoft_tenant_id: str = Field(
+        default="common",
+        validation_alias=AliasChoices("MICROSOFT_TENANT_ID", "MICROSOFT_OAUTH_TENANT_ID"),
+    )
 
     # DeepSeek — OFF by default; never send PHI in prompts
     deepseek_api_key: str = ""
@@ -54,7 +72,10 @@ class Settings(BaseSettings):
     deepseek_enabled: bool = False
 
     # AWS / Rekognition — prefer IAM task role in ECS
-    aws_region: str = ""  # set via AWS_REGION env (e.g. your deployment region)
+    aws_region: str = Field(
+        default="",
+        validation_alias=AliasChoices("AWS_REGION", "AWS_DEFAULT_REGION"),
+    )
     aws_access_key_id: str = ""
     aws_secret_access_key: str = ""
     rekognition_enabled: bool = False
@@ -74,6 +95,14 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.environment == "prod"
+
+    @property
+    def google_configured(self) -> bool:
+        return bool(self.google_client_id.strip())
+
+    @property
+    def microsoft_configured(self) -> bool:
+        return bool(self.microsoft_client_id.strip())
 
 
 @lru_cache

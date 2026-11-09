@@ -12,7 +12,13 @@ export function Nav() {
       {isAuthenticated ? (
         <div className="nav-actions">
           <span className="nav-user">{user?.email}</span>
-          <button type="button" className="btn btn-ghost" onClick={logout}>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => {
+              void logout()
+            }}
+          >
             Sign out
           </button>
         </div>
