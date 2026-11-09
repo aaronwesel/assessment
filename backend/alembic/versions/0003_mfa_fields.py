@@ -1,9 +1,11 @@
 """Add MFA columns to users.
 
-Revision ID: 0002_mfa_fields
-Revises: 0001_initial_stub
+Revision ID: 0003_mfa_fields
+Revises: 0002_teams_stub
 Create Date: 2026-11-09
 
+Chains after team stubs so alembic has a single head. TOTP secrets are stored
+Fernet-encrypted; backup codes are bcrypt hashes in a JSON text column.
 """
 
 from typing import Sequence, Union
@@ -11,8 +13,8 @@ from typing import Sequence, Union
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0002_mfa_fields"
-down_revision: Union[str, None] = "0001_initial_stub"
+revision: str = "0003_mfa_fields"
+down_revision: Union[str, None] = "0002_teams_stub"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
