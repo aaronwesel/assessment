@@ -1,0 +1,105 @@
+# Scaffold CI: lint · test · docker · terraform fmt/validate.
+# No terraform apply. No secrets required for these stubs.
+
+name: ci
+
+on:
+  push:
+    branches: [main, "prep/**"]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Backend lint (stub until packages exist)
+        run: |
+          if [ -f backend/pyproject.toml ] || [ -f backend/requirements.txt ]; then
+            echo "Backend package files present — wire ruff/mypy in a follow-up."
+          else
+            echo "No backend package yet; lint stub OK."
+          fi
+      - name: Frontend lint (stub until package.json exists)
+        run: |
+          if [ -f frontend/package.json ]; then
+            echo "Frontend package.json present — wire eslint/tsc in a follow-up."
+          else
+            echo "No frontend package yet; lint stub OK."
+          fi
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unit / integration stub
+        run: |
+          if [ -d backend/tests ] || [ -f backend/pyproject.toml ]; then
+            echo "Backend tests path present — wire pytest in a follow-up."
+          else
+            echo "No backend tests yet; test stub OK."
+          fi
+
+  docker:
+    name: docker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Compose file
+        run: docker compose -f docker-compose.yml config --quiet
+      - name: Build images when Dockerfiles exist
+        run: |
+          set -euo pipefail
+          built=0
+          if [ -f backend/Dockerfile ]; then
+            docker build -t assessment-api:ci ./backend
+            built=1
+          fi
+          if [ -f frontend/Dockerfile ]; then
+            docker build -t assessment-frontend:ci ./frontend
+            built=1
+          fi
+          if [ "$built" -eq 0 ]; then
+            echo "No app Dockerfiles yet; compose config check is the docker gate."
+            docker pull --quiet hashicorp/http-echo:1.0
+            docker pull --quiet postgres:16-alpine
+            docker pull --quiet redis:7-alpine
+          fi
+
+  terraform:
+    name: terraform
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/terraform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+      - name: Detect Terraform root
+        id: tf
+        run: |
+          if ls *.tf >/dev/null 2>&1; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "No .tf files yet; terraform fmt/validate stub OK (no apply)."
+          fi
+      - name: terraform fmt -check
+        if: steps.tf.outputs.present == 'true'
+        run: terraform fmt -check -recursive
+      - name: terraform init -backend=false
+        if: steps.tf.outputs.present == 'true'
+        run: terraform init -backend=false
+      - name: terraform validate
+        if: steps.tf.outputs.present == 'true'
+        run: terraform validate
+      # Explicitly never: terraform apply / plan against real cloud from CI in prep.
