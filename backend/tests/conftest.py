@@ -14,6 +14,8 @@ os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/15")
 os.environ.setdefault("DEEPSEEK_ENABLED", "false")
 os.environ.setdefault("REKOGNITION_ENABLED", "false")
+os.environ.setdefault("SES_ENABLED", "false")
+os.environ.setdefault("LOGIN_ALERT_EMAIL_ENABLED", "false")
 os.environ.setdefault("CORS_ORIGINS", "http://localhost:5173")
 
 from app.core.config import get_settings

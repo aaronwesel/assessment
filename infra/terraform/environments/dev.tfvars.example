@@ -31,6 +31,11 @@ log_retention_days = 30
 enable_waf         = true
 enable_nat_gateway = true
 
+# SES placeholders (verify identity on assessment day; DO NOT apply yet)
+enable_ses      = true
+ses_domain_name = ""
+ses_from_email  = ""
+
 tags = {
   CostCenter = "assessment-dev"
 }

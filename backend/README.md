@@ -1,6 +1,6 @@
 # Backend (FastAPI)
 
-HIPAA-minded FastAPI scaffold: JWT + RBAC stubs, Google/Microsoft One Tap token-exchange stubs, Redis client stub, DeepSeek (off) + Rekognition stubs, Alembic, health probes.
+HIPAA-minded FastAPI scaffold: JWT + RBAC stubs, Google/Microsoft One Tap token-exchange stubs, Redis client stub, DeepSeek (off) + Rekognition stubs, Amazon SES alert client (off) with PHI-free templates, Alembic, health probes.
 
 ## Quick start
 
@@ -21,5 +21,6 @@ pytest
 ## Notes
 
 - Migrations via Alembic (`alembic upgrade head`) — not on API boot.
-- `DEEPSEEK_ENABLED` and `REKOGNITION_ENABLED` default to `false`.
+- `DEEPSEEK_ENABLED`, `REKOGNITION_ENABLED`, `SES_ENABLED`, and `LOGIN_ALERT_EMAIL_ENABLED` default to `false`.
+- SES alert templates forbid PHI in bodies by default (`app/alerts/templates.py`).
 - Do not log PHI; see `app/core/logging.py`.

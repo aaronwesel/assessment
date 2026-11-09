@@ -7,6 +7,7 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
 
+from app.alerts.login_alert import maybe_send_login_alert
 from app.core.logging import get_logger, log_event
 from app.core.rbac import AuthContext, Role, get_current_auth, require_role
 from app.core.security import (
@@ -99,6 +100,9 @@ def login_password(body: PasswordLoginRequest) -> TokenPair:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
         )
+    # Optional SES login alert (LOGIN_ALERT_EMAIL_ENABLED=false by default).
+    # Does not embed email/subject in the message body (HIPAA: no PHI in alerts).
+    maybe_send_login_alert(event_code="password_login_success")
     return _issue_tokens(subject=body.email, roles=[user["role"]])
 
 

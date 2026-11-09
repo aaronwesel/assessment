@@ -59,6 +59,14 @@ class Settings(BaseSettings):
     aws_secret_access_key: str = ""
     rekognition_enabled: bool = False
 
+    # Amazon SES — OFF by default; alert bodies must not contain PHI
+    ses_from_email: str = ""
+    ses_region: str = ""  # falls back to aws_region when empty
+    ses_enabled: bool = False
+    # Optional login-alert hook (requires SES_ENABLED + recipient)
+    login_alert_email_enabled: bool = False
+    login_alert_to_email: str = ""  # comma-separated ops mailboxes; not end-user PHI
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

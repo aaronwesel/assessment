@@ -117,6 +117,24 @@ variable "enable_waf" {
   default     = true
 }
 
+variable "enable_ses" {
+  description = "Create SES identity/config-set placeholders (DO NOT apply until assessment day)"
+  type        = bool
+  default     = true
+}
+
+variable "ses_domain_name" {
+  description = "Domain for SES domain identity (placeholder until assessment day)"
+  type        = string
+  default     = ""
+}
+
+variable "ses_from_email" {
+  description = "Verified FROM email for SES (placeholder; must match identity)"
+  type        = string
+  default     = ""
+}
+
 variable "enable_nat_gateway" {
   description = "Create NAT gateway for private subnet egress (costly; on for prod-like)"
   type        = bool

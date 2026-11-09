@@ -26,6 +26,12 @@ variable "cloudwatch_log_group_arns" {
   type = list(string)
 }
 
+variable "ses_identity_arns" {
+  description = "SES identity ARNs to scope SendEmail (empty → wildcard placeholder until identities exist)"
+  type        = list(string)
+  default     = []
+}
+
 variable "tags" {
   type    = map(string)
   default = {}
