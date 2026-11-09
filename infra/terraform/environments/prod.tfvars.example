@@ -1,0 +1,37 @@
+# Copy to environments/prod.tfvars (do not commit real secrets).
+# terraform apply is FORBIDDEN until assessment day.
+
+project_name = "assessment"
+environment  = "prod"
+aws_region   = "eu-west-1"
+
+vpc_cidr           = "10.30.0.0/16"
+availability_zones = ["eu-west-1a", "eu-west-1b", "eu-west-1c"]
+
+# REQUIRED before prod apply
+acm_certificate_arn = "arn:aws:acm:eu-west-1:CHANGE_ME:certificate/CHANGE_ME"
+
+api_image_tag    = "stable"
+worker_image_tag = "stable"
+
+api_cpu              = 1024
+api_memory           = 2048
+api_desired_count    = 2
+worker_cpu           = 1024
+worker_memory        = 2048
+worker_desired_count = 2
+
+db_engine_version = "15.4"
+db_instance_class = "db.r6g.large"
+db_name           = "assessment"
+
+redis_node_type = "cache.r6g.large"
+
+log_retention_days = 90
+enable_waf         = true
+enable_nat_gateway = true
+
+tags = {
+  CostCenter = "assessment-prod"
+  Criticality = "high"
+}

@@ -1,0 +1,36 @@
+# Copy to environments/dev.tfvars (do not commit real secrets).
+# terraform apply is FORBIDDEN until assessment day.
+
+project_name = "assessment"
+environment  = "dev"
+aws_region   = "eu-west-1"
+
+vpc_cidr           = "10.20.0.0/16"
+availability_zones = ["eu-west-1a", "eu-west-1b"]
+
+# Set to a real ACM cert ARN before apply; HTTPS listener is skipped when empty.
+acm_certificate_arn = ""
+
+api_image_tag    = "latest"
+worker_image_tag = "latest"
+
+api_cpu            = 512
+api_memory         = 1024
+api_desired_count  = 1
+worker_cpu         = 512
+worker_memory      = 1024
+worker_desired_count = 1
+
+db_engine_version = "15.4"
+db_instance_class = "db.t4g.medium"
+db_name           = "assessment"
+
+redis_node_type = "cache.t4g.micro"
+
+log_retention_days = 30
+enable_waf         = true
+enable_nat_gateway = true
+
+tags = {
+  CostCenter = "assessment-dev"
+}

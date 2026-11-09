@@ -1,0 +1,20 @@
+# Local state / plans — never commit
+*.tfstate
+*.tfstate.*
+*.tfplan
+.terraform/
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Real env files (examples are committed)
+environments/*.tfvars
+!environments/*.tfvars.example
+
+# Secrets / local clutter
+*.pem
+.env
+.env.*
