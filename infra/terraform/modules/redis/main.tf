@@ -1,3 +1,7 @@
+# ElastiCache Redis — JWT session registry + token blacklist for the API.
+# at-rest + in-transit encryption + auth token are required for HIPAA-minded prep.
+# App keys: session:access|refresh:{jti}, blacklist:{jti} (never store PHI here).
+
 resource "aws_elasticache_subnet_group" "this" {
   name       = "${var.name_prefix}-redis"
   subnet_ids = var.subnet_ids

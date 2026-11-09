@@ -1,4 +1,22 @@
-"""Application settings loaded from environment (no secrets in code)."""
+"""
+Application settings loaded from environment / `.env` (no secrets in source).
+
+Why pydantic-settings: a single typed surface for local Compose, ECS task env,
+and Secrets Manager–injected values. AliasChoices accept both short and
+`*_OAUTH_*` names so Compose and AWS wiring stay interchangeable.
+
+Auth / JWT:
+- `secret_key` signs access + refresh tokens (HS256 by default).
+- Short access TTL + longer refresh TTL matches Redis session keys in security.py.
+
+Load balancing:
+- Optional Redis rate limits (`RATE_LIMIT_*`) stay consistent across ECS tasks
+  when ALB sticky sessions are OFF.
+
+HIPAA / safety defaults:
+- DeepSeek, Rekognition, and SES are OFF unless explicitly enabled.
+- Login-alert recipients are ops mailboxes, not end-user PHI destinations.
+"""
 
 from functools import lru_cache
 from typing import Literal
@@ -122,4 +140,5 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
+    """Cached settings singleton — process env is fixed for the worker lifetime."""
     return Settings()

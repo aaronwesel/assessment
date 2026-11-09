@@ -1,4 +1,16 @@
-"""Redis client stub for sessions, rate limits, and token blacklist."""
+"""
+Redis client for sessions, rate limits, and JWT blacklist.
+
+Production (ElastiCache) stores:
+- `session:access:{jti}` / `session:refresh:{jti}` — live token registry
+- `blacklist:{jti}` — revoked tokens until natural expiry
+- `ratelimit:{client}:{bucket}` — fixed-window counters (cross-task when sticky OFF)
+
+Local/dev: if Redis is unreachable we keep an in-memory stub so auth still works
+in unit tests and laptop Compose without failing boot. Do not log connection
+URLs (may embed passwords). HIPAA: Redis must never hold PHI payloads — only
+opaque ids and flags.
+"""
 
 from __future__ import annotations
 
@@ -67,6 +79,7 @@ class RedisClientStub:
         return current
 
     def blacklist_token(self, jti: str, ttl_seconds: int) -> None:
+        """Mark a JWT id revoked; TTL mirrors remaining token lifetime."""
         self.set(f"blacklist:{jti}", "1", ex=ttl_seconds)
 
     def is_blacklisted(self, jti: str) -> bool:
@@ -77,6 +90,7 @@ _redis_stub: RedisClientStub | None = None
 
 
 def get_redis() -> RedisClientStub:
+    """Process-wide Redis wrapper (lazy connect on first use)."""
     global _redis_stub
     if _redis_stub is None:
         _redis_stub = RedisClientStub()

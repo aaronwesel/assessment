@@ -1,4 +1,15 @@
-"""User persistence helpers for password + federated login."""
+"""
+User persistence helpers for password + federated (Google/Microsoft) login.
+
+Responsibilities:
+- Create password accounts with bcrypt hashes and a `password` AccountLink.
+- Authenticate password logins without leaking whether email vs password failed
+  at the HTTP layer (routes return a generic 401).
+- Upsert federated users by provider subject; link to an existing email row when
+  present so One Tap can attach to a prior password account.
+
+HIPAA: log only provider/event codes — never emails or tokens.
+"""
 
 from __future__ import annotations
 
@@ -41,6 +52,7 @@ def create_password_user(
     password: str,
     full_name: str | None = None,
 ) -> User:
+    """Register a local password user; raises ValueError if email already exists."""
     normalized = email.lower().strip()
     if get_user_by_email(session, normalized) is not None:
         raise ValueError("User already exists")
@@ -68,6 +80,7 @@ def create_password_user(
 
 
 def authenticate_password(session: Session, *, email: str, password: str) -> User | None:
+    """Return the active user on success, else None (no distinction of failure reason)."""
     user = get_user_by_email(session, email.lower().strip())
     if user is None or not user.is_active:
         return None
@@ -130,4 +143,5 @@ def upsert_federated_user(
 
 
 def role_values(user: User) -> list[str]:
+    """Normalize SQLModel/enum role into JWT claim strings."""
     return [user.role.value if hasattr(user.role, "value") else str(user.role)]

@@ -1,4 +1,9 @@
-"""Shared FastAPI dependencies."""
+"""
+Shared FastAPI dependency aliases used by route handlers.
+
+Keeps `Annotated[..., Depends(...)]` types in one place so handlers stay thin
+and RBAC/session/Redis wiring is consistent across the API surface.
+"""
 
 from typing import Annotated
 

@@ -1,3 +1,7 @@
+/**
+ * Authenticated home — shows identity from /auth/me; no domain screens yet.
+ * Gated by RequireAuth; uses JWT-backed user from AuthContext.
+ */
 import { useAuth } from '../auth/AuthContext'
 
 /** Authenticated home — shows identity from /auth/me; no domain screens yet. */

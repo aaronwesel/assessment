@@ -1,4 +1,13 @@
-"""Optional login-alert email hook. OFF by default; never blocks the auth response."""
+"""
+Optional login-alert email hook. OFF by default; never blocks the auth response.
+
+When `LOGIN_ALERT_EMAIL_ENABLED` and SES are on, successful logins fire a
+best-effort ops email. Failures are swallowed so JWT issuance is never delayed
+by SES outages.
+
+HIPAA: recipients come from config (ops mailboxes), not the authenticated user.
+Bodies use `render_login_alert` — event codes + timestamps only, no PHI/PII.
+"""
 
 from __future__ import annotations
 

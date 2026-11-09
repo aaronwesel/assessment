@@ -1,3 +1,7 @@
+/**
+ * Public login page: Google One Tap, Microsoft MSAL, and password form.
+ * Already-authenticated users are redirected home.
+ */
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { GoogleOneTap } from '../components/GoogleOneTap'

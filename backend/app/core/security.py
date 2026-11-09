@@ -1,4 +1,15 @@
-"""JWT access/refresh tokens with jti for Redis blacklist/session tracking."""
+"""
+JWT access/refresh tokens with `jti` for Redis blacklist and session tracking.
+
+Auth model:
+- Access tokens carry `sub` + `roles` and a short TTL (default 15m).
+- Refresh tokens rotate on use; old refresh `jti` is blacklisted.
+- Each issued token stores `session:{type}:{jti}` in Redis until expiry so logout
+  can drop live sessions without waiting for natural JWT expiry alone.
+
+HIPAA: never put PHI (emails, names, medical fields) in JWT claims — only opaque
+subject ids and role strings. Passwords use bcrypt; plaintext never logged.
+"""
 
 from __future__ import annotations
 
@@ -16,6 +27,7 @@ TokenType = Literal["access", "refresh"]
 
 
 def hash_password(password: str) -> str:
+    """One-way bcrypt hash for password accounts (federated users leave this null)."""
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
@@ -52,6 +64,7 @@ def _create_token(
 
 
 def create_access_token(subject: str, roles: list[str] | None = None) -> str:
+    """Issue a short-lived access JWT and register its jti in Redis."""
     settings = get_settings()
     token, jti, ttl = _create_token(
         subject=subject,
@@ -64,6 +77,7 @@ def create_access_token(subject: str, roles: list[str] | None = None) -> str:
 
 
 def create_refresh_token(subject: str) -> str:
+    """Issue a longer-lived refresh JWT and register its jti in Redis."""
     settings = get_settings()
     token, jti, ttl = _create_token(
         subject=subject,
@@ -80,6 +94,11 @@ def decode_token(
     *,
     check_blacklist: bool = True,
 ) -> dict[str, Any]:
+    """
+    Verify signature/expiry and optionally reject Redis-blacklisted jtis.
+
+    Raises ValueError for invalid/revoked tokens (routes map this to 401).
+    """
     settings = get_settings()
     try:
         payload = jwt.decode(token, settings.secret_key, algorithms=[settings.jwt_algorithm])
@@ -97,6 +116,7 @@ def revoke_token(token: str) -> None:
     """Blacklist a token's jti until its natural expiry (best-effort)."""
     settings = get_settings()
     try:
+        # verify_exp=False so logout still works on near-expired tokens.
         payload = jwt.decode(
             token,
             settings.secret_key,

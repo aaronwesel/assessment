@@ -1,3 +1,9 @@
+/**
+ * Top-level router shell.
+ *
+ * AuthProvider holds JWT tokens in sessionStorage; RequireAuth gates `/`.
+ * Login is public; unknown paths redirect home (which then bounces to login).
+ */
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
 import { Nav } from './components/Nav'

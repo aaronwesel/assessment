@@ -1,4 +1,9 @@
-"""Import models for Alembic metadata discovery."""
+"""
+Import models for Alembic metadata discovery.
+
+`alembic/env.py` imports this module so `SQLModel.metadata` includes all tables
+before generating or applying migrations.
+"""
 
 from sqlmodel import SQLModel
 

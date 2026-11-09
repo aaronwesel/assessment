@@ -1,3 +1,6 @@
+# Customer-managed CMK shared by RDS, Redis, Secrets Manager, and CloudWatch.
+# Key rotation enabled; least-privilege key policy for logs service principal.
+
 data "aws_caller_identity" "current" {}
 data "aws_partition" "current" {}
 data "aws_region" "current" {}

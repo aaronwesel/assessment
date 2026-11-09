@@ -1,3 +1,9 @@
+/**
+ * Email/password register + login against FastAPI JWT endpoints.
+ *
+ * Calls `/auth/register` or `/auth/login`, then AuthContext.loginWithTokens.
+ * Client-side length checks are UX only — server enforces min password length.
+ */
 import { useState, type FormEvent } from 'react'
 import { loginPassword, registerPassword } from '../api/auth'
 import { useAuth } from '../auth/AuthContext'

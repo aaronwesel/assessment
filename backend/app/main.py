@@ -1,4 +1,15 @@
-"""FastAPI application factory."""
+"""
+FastAPI application factory and ASGI entrypoint (`app.main:app`).
+
+Creates the API process used by uvicorn / ECS: CORS, security headers, optional
+Redis rate limiting, request-id tracing, health probes at the root (ALB-friendly),
+and versioned routes under `/api/v1`.
+
+HIPAA notes:
+- OpenAPI docs are disabled in production so schema/auth surfaces are not public.
+- Startup logs use structured `log_event` flags only (no secrets, emails, or PHI).
+- Schema auto-create runs only in local/test; production must migrate as a deploy step.
+"""
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -20,6 +31,7 @@ logger = get_logger(__name__)
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    """Warm Redis (or in-memory stub) and optionally create local tables on boot."""
     settings = get_settings()
     log_event(
         logger,
@@ -32,6 +44,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         ses_enabled=settings.ses_enabled,
         slack_enabled=settings.slack_enabled,
     )
+    # Eager connect so readiness reflects Redis early; falls back to stub if down.
     get_redis()
     # Local/test: ensure schema without requiring a prior alembic upgrade.
     # Production should run migrations as a deploy step (not on API boot).
@@ -44,6 +57,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
 
 def create_app() -> FastAPI:
+    """Build a configured FastAPI instance (factory keeps tests/import side effects clean)."""
     settings = get_settings()
     application = FastAPI(
         title=settings.app_name,

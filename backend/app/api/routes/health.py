@@ -1,4 +1,5 @@
-"""Health and readiness endpoints for load balancers and orchestrators.
+"""
+Health and readiness endpoints for load balancers and orchestrators.
 
 | Path            | Role        | Use |
 |-----------------|-------------|-----|
@@ -8,6 +9,9 @@
 ALB target groups should probe `/health` only. Returning 5xx from readiness
 must not be the ALB health path or tasks would flap when Redis briefly blips.
 Workers are not behind the ALB; they do not need these routes for fan-out.
+
+HIPAA: readiness payloads expose feature flags and connectivity booleans only —
+never secrets, emails, tokens, or PHI.
 """
 
 from __future__ import annotations

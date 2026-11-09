@@ -1,3 +1,14 @@
+/**
+ * Thin fetch client for FastAPI auth routes under `/api/v1/auth/*`.
+ *
+ * Flow overview:
+ * - Password register/login → JWT pair
+ * - Google/Microsoft One Tap → POST id_token → JWT pair
+ * - `/me` hydrates the user for AuthContext (Bearer access token)
+ * - Logout best-effort revokes tokens via Redis blacklist on the API
+ *
+ * Do not console.log tokens, passwords, or ID tokens (HIPAA / PII hygiene).
+ */
 import { config } from '../config'
 import type { AuthProvider, AuthTokens, AuthUser } from '../auth/types'
 
@@ -67,6 +78,7 @@ export async function exchangeOneTap(
   provider: 'google' | 'microsoft',
   idToken: string,
 ): Promise<AuthTokens> {
+  /** Hand the IdP JWT to the API; server verifies and returns our access/refresh pair. */
   const path =
     provider === 'google'
       ? '/api/v1/auth/google/onetap'

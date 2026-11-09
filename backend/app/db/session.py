@@ -1,4 +1,13 @@
-"""SQLAlchemy / SQLModel engine and session helpers."""
+"""
+SQLAlchemy / SQLModel engine and session helpers.
+
+`get_session` is the FastAPI dependency that yields a request-scoped Session.
+SQLite StaticPool support exists for pytest in-memory DBs; production uses
+Postgres (`postgresql+psycopg://...`) with `pool_pre_ping`.
+
+`init_db` is for local/test convenience only — production schema changes go
+through Alembic as a deploy step (see `alembic/env.py`).
+"""
 
 from collections.abc import Generator
 

@@ -1,3 +1,9 @@
+/**
+ * Microsoft Entra / MSAL popup sign-in.
+ *
+ * Uses `@azure/msal-browser` with sessionStorage cache, then exchanges the ID
+ * token with POST /api/v1/auth/microsoft/onetap. Backend verifies via JWKS.
+ */
 import { useState } from 'react'
 import {
   PublicClientApplication,

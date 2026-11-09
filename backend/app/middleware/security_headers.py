@@ -1,4 +1,10 @@
-"""Security headers middleware (HIPAA-minded baseline)."""
+"""
+Security headers middleware (HIPAA-minded baseline for browser clients).
+
+Adds nosniff, frame denial, no-referrer, locked-down permissions, and no-store
+caching so auth responses and API JSON are not left in shared caches. This is
+defense-in-depth alongside HTTPS at the ALB and CSP that the SPA may add later.
+"""
 
 from collections.abc import Callable
 

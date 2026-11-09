@@ -1,4 +1,14 @@
-"""Auth: password register/login, Google/Microsoft One Tap exchange, JWT refresh."""
+"""
+Auth HTTP surface: password register/login, Google/Microsoft One Tap exchange,
+JWT refresh/logout, and RBAC-protected introspection.
+
+Providers return our own JWT pair (access + refresh). Federated ID tokens are
+verified server-side then discarded — we never persist Google/Microsoft tokens.
+
+HIPAA / SES:
+- Audit logs use event codes only (no email/password/id_token in logs).
+- Optional login alerts via SES are ops-mailbox only and omit account identifiers.
+"""
 
 from __future__ import annotations
 
@@ -77,6 +87,7 @@ class AuthProvidersResponse(BaseModel):
 
 
 def _issue_tokens(subject: str, roles: list[str]) -> TokenPair:
+    """Mint access+refresh JWTs and register both jtis in Redis sessions."""
     return TokenPair(
         access_token=create_access_token(subject=subject, roles=roles),
         refresh_token=create_refresh_token(subject=subject),
@@ -85,6 +96,7 @@ def _issue_tokens(subject: str, roles: list[str]) -> TokenPair:
 
 @router.get("/providers", response_model=AuthProvidersResponse)
 def auth_providers() -> AuthProvidersResponse:
+    """Public capability probe for the SPA (which buttons to show)."""
     settings = get_settings()
     return AuthProvidersResponse(
         google=settings.google_configured,
@@ -132,6 +144,7 @@ def login_password(body: PasswordLoginRequest, session: SessionDep) -> TokenPair
 
 @router.post("/refresh", response_model=TokenPair)
 def refresh_tokens(body: RefreshRequest, session: SessionDep) -> TokenPair:
+    """Rotate refresh: blacklist old jti, issue a fresh access+refresh pair."""
     try:
         payload = decode_token(body.refresh_token, expected_type="refresh")
     except ValueError as exc:
@@ -154,6 +167,7 @@ def refresh_tokens(body: RefreshRequest, session: SessionDep) -> TokenPair:
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 def logout(body: LogoutRequest, _redis: RedisDep) -> None:
+    """Best-effort revoke: blacklist provided tokens in Redis until expiry."""
     log_event(logger, "logout")
     if body.access_token:
         revoke_token(body.access_token)
@@ -229,6 +243,7 @@ def auth_me(
     auth: Annotated[AuthContext, Depends(get_current_auth)],
     session: SessionDep,
 ) -> ProtectedPingResponse:
+    """Return the authenticated profile for the SPA home screen."""
     user = user_service.get_user_by_id(session, auth.subject)
     return ProtectedPingResponse(
         subject=auth.subject,
@@ -246,6 +261,7 @@ def auth_me(
 def admin_ping(
     auth: Annotated[AuthContext, Depends(get_current_auth)],
 ) -> ProtectedPingResponse:
+    """RBAC smoke endpoint — requires admin role claim on the access token."""
     return ProtectedPingResponse(
         subject=auth.subject,
         roles=sorted(auth.roles),

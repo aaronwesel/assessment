@@ -1,9 +1,13 @@
-"""Initial stub tables: users + account_links.
+"""
+Initial stub tables: users + account_links.
+
+Creates the auth schema only — no clinical/PHI tables. Password hashes live on
+`users`; federated subjects live on `account_links` with a unique
+(provider, provider_subject) constraint.
 
 Revision ID: 0001_initial_stub
 Revises:
 Create Date: 2026-11-09
-
 """
 
 from typing import Sequence, Union

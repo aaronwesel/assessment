@@ -1,4 +1,9 @@
-"""API v1 router aggregation."""
+"""
+API v1 router aggregation.
+
+Mounted under `settings.api_v1_prefix` (default `/api/v1`) from `create_app`.
+Root `/health` stays outside this router for ALB target-group probes.
+"""
 
 from fastapi import APIRouter
 

@@ -1,5 +1,14 @@
-# Root wiring for assessment AWS scaffold.
+# Root wiring for the assessment AWS scaffold (HIPAA-ready defaults).
 # DO NOT terraform apply until assessment day (see README.md).
+#
+# Dependency sketch:
+#   KMS → encrypts RDS / Redis / Secrets / CloudWatch
+#   VPC + security groups → private data plane
+#   ALB (+ optional WAF) → public HTTPS → ECS Fargate API (stickiness OFF)
+#   RDS + ElastiCache Redis → auth sessions / JWT blacklist / rate limits
+#   SES → ops alerts (no PHI in bodies; see app.alerts)
+#   IAM task role → least-privilege AWS API access (prefer over static keys)
+#   ECS autoscaling → API on CPU/memory/ALB RequestCountPerTarget
 
 module "kms" {
   source = "./modules/kms"

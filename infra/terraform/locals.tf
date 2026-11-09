@@ -1,3 +1,4 @@
+# Shared naming/tags and HIPAA encryption defaults for every module below.
 locals {
   name_prefix = "${var.project_name}-${var.environment}"
 

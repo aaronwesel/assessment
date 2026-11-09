@@ -1,4 +1,10 @@
-"""User model stub — no domain PHI fields."""
+"""
+User model stub — account identity only; no domain PHI fields.
+
+Stores email + optional bcrypt hash for password auth, and a coarse RBAC role.
+JWT `sub` is the opaque `id` UUID — prefer that over email in tokens and logs.
+Do not add medical/clinical columns here without an explicit HIPAA data model.
+"""
 
 from datetime import datetime
 from enum import Enum
