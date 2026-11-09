@@ -134,6 +134,16 @@ resource "aws_iam_role_policy" "ecs_task" {
           "rekognition:DetectFaces"
         ]
         Resource = ["*"] # Rekognition Detect* APIs do not support resource-level ARNs
+      },
+      {
+        # Amazon SES send for login/system alerts — scoped to identity ARNs when provided.
+        Sid    = "SesSend"
+        Effect = "Allow"
+        Action = [
+          "ses:SendEmail",
+          "ses:SendRawEmail"
+        ]
+        Resource = length(var.ses_identity_arns) > 0 ? var.ses_identity_arns : ["*"]
       }
     ]
   })

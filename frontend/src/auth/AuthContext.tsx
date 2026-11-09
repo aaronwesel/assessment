@@ -6,15 +6,17 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import type { AuthContextValue, AuthUser } from './types'
+import { fetchMe, logoutTokens } from '../api/auth'
+import type { AuthContextValue, AuthProvider, AuthTokens, AuthUser } from './types'
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
-const STORAGE_KEY = 'assessment.auth.user'
+const USER_KEY = 'assessment.auth.user'
+const TOKENS_KEY = 'assessment.auth.tokens'
 
 function readStoredUser(): AuthUser | null {
   try {
-    const raw = sessionStorage.getItem(STORAGE_KEY)
+    const raw = sessionStorage.getItem(USER_KEY)
     if (!raw) return null
     return JSON.parse(raw) as AuthUser
   } catch {
@@ -22,27 +24,51 @@ function readStoredUser(): AuthUser | null {
   }
 }
 
+function readStoredTokens(): AuthTokens | null {
+  try {
+    const raw = sessionStorage.getItem(TOKENS_KEY)
+    if (!raw) return null
+    return JSON.parse(raw) as AuthTokens
+  } catch {
+    return null
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(() => readStoredUser())
+  const [tokens, setTokens] = useState<AuthTokens | null>(() => readStoredTokens())
 
-  const login = useCallback((next: AuthUser) => {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(next))
-    setUser(next)
-  }, [])
+  const loginWithTokens = useCallback(
+    async (nextTokens: AuthTokens, provider: AuthProvider) => {
+      const nextUser = await fetchMe(nextTokens.access_token, provider)
+      sessionStorage.setItem(TOKENS_KEY, JSON.stringify(nextTokens))
+      sessionStorage.setItem(USER_KEY, JSON.stringify(nextUser))
+      setTokens(nextTokens)
+      setUser(nextUser)
+    },
+    [],
+  )
 
-  const logout = useCallback(() => {
-    sessionStorage.removeItem(STORAGE_KEY)
+  const logout = useCallback(async () => {
+    const current = tokens ?? readStoredTokens()
+    if (current) {
+      await logoutTokens(current)
+    }
+    sessionStorage.removeItem(TOKENS_KEY)
+    sessionStorage.removeItem(USER_KEY)
+    setTokens(null)
     setUser(null)
-  }, [])
+  }, [tokens])
 
   const value = useMemo(
     () => ({
       user,
-      isAuthenticated: user !== null,
-      login,
+      tokens,
+      isAuthenticated: user !== null && tokens !== null,
+      loginWithTokens,
       logout,
     }),
-    [user, login, logout],
+    [user, tokens, loginWithTokens, logout],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

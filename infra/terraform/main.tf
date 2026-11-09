@@ -51,6 +51,16 @@ module "cloudwatch" {
   tags              = local.common_tags
 }
 
+module "ses" {
+  source = "./modules/ses"
+
+  name_prefix = local.name_prefix
+  enable_ses  = var.enable_ses
+  domain_name = var.ses_domain_name
+  from_email  = var.ses_from_email
+  tags        = local.common_tags
+}
+
 module "iam" {
   source = "./modules/iam"
 
@@ -68,6 +78,11 @@ module "iam" {
     module.cloudwatch.api_log_group_arn,
     module.cloudwatch.worker_log_group_arn,
   ]
+  # Scope SES send to identities when placeholders are filled; else wildcard sketch.
+  ses_identity_arns = compact([
+    module.ses.domain_identity_arn,
+    module.ses.email_identity_arn,
+  ])
   tags = local.common_tags
 }
 

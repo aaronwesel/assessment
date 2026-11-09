@@ -14,8 +14,12 @@ import com.assessment.app.BuildConfig
 object ApiConfig {
     val BASE_URL: String = BuildConfig.API_BASE_URL.trimEnd('/')
 
-    // Placeholder paths — align with backend OpenAPI when auth stubs land.
-    const val LOGIN_PASSWORD_PATH = "/auth/login"
-    const val LOGIN_GOOGLE_PATH = "/auth/google"
-    const val LOGIN_MICROSOFT_PATH = "/auth/microsoft"
+    // Auth API paths (same contract as web / iOS).
+    const val LOGIN_PASSWORD_PATH = "/api/v1/auth/login"
+    const val REGISTER_PASSWORD_PATH = "/api/v1/auth/register"
+    const val LOGIN_GOOGLE_PATH = "/api/v1/auth/google/onetap"
+    const val LOGIN_MICROSOFT_PATH = "/api/v1/auth/microsoft/onetap"
+    const val AUTH_ME_PATH = "/api/v1/auth/me"
+    const val AUTH_REFRESH_PATH = "/api/v1/auth/refresh"
+    const val AUTH_LOGOUT_PATH = "/api/v1/auth/logout"
 }
