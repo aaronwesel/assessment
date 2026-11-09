@@ -1,5 +1,5 @@
 # Local stack parity with AWS shape: API + Postgres + Redis + frontend.
-# Stubs are intentional until backend/frontend Dockerfiles land.
+# API builds from backend/; frontend remains a stub until its Dockerfile lands.
 # No secrets here — use .env (from .env.example).
 
 services:
@@ -31,11 +31,11 @@ services:
       timeout: 3s
       retries: 10
 
-  # Stub until backend/Dockerfile exists. Replace build/image when API lands.
-  # http-echo is scratch-based (no shell); health is port reachability / HTTP GET.
   api:
-    image: hashicorp/http-echo:1.0
-    command: ["-text=api-stub-ok", "-listen=:8000"]
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: assessment-api:local
     restart: unless-stopped
     ports:
       - "${API_PORT:-8000}:8000"
@@ -43,13 +43,37 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://app:changeme-local-only@db:5432/app}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       ENVIRONMENT: ${ENVIRONMENT:-local}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      JWT_SECRET: ${JWT_SECRET:-replace-with-local-secret}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-15}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID:-}
+      MICROSOFT_TENANT_ID: ${MICROSOFT_TENANT_ID:-common}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_ENABLED: ${DEEPSEEK_ENABLED:-false}
+      AWS_REGION: ${AWS_REGION:-}
+      REKOGNITION_ENABLED: ${REKOGNITION_ENABLED:-false}
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
 
   # Stub until frontend/Dockerfile exists. Replace build/image when UI lands.
+  # http-echo is scratch-based (no shell); health is port reachability / HTTP GET.
   frontend:
     image: hashicorp/http-echo:1.0
     command: ["-text=frontend-stub-ok", "-listen=:3000"]
@@ -59,7 +83,8 @@ services:
     environment:
       VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
     depends_on:
-      - api
+      api:
+        condition: service_healthy
 
 volumes:
   postgres_data:

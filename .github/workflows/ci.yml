@@ -54,20 +54,15 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate Compose file
         run: docker compose -f docker-compose.yml config --quiet
-      - name: Build images when Dockerfiles exist
+      - name: Build Compose API image
+        run: docker compose -f docker-compose.yml build api
+      - name: Build frontend image when Dockerfile exists
         run: |
           set -euo pipefail
-          built=0
-          if [ -f backend/Dockerfile ]; then
-            docker build -t assessment-api:ci ./backend
-            built=1
-          fi
           if [ -f frontend/Dockerfile ]; then
-            docker build -t assessment-frontend:ci ./frontend
-            built=1
-          fi
-          if [ "$built" -eq 0 ]; then
-            echo "No app Dockerfiles yet; compose config check is the docker gate."
+            docker compose -f docker-compose.yml build frontend
+          else
+            echo "No frontend/Dockerfile yet; pulling frontend stub + data plane images."
             docker pull --quiet hashicorp/http-echo:1.0
             docker pull --quiet postgres:16-alpine
             docker pull --quiet redis:7-alpine

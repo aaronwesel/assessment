@@ -28,16 +28,16 @@ Production-oriented, HIPAA-ready SaaS scaffold (FastAPI · React · Terraform �
    docker compose up --build
    ```
 
-3. Health checks (once sibling services ship real images/endpoints):
+3. Health checks:
 
    | Service | Default URL / check |
    |---------|---------------------|
    | API | `GET http://localhost:8000/health` → `200` |
-   | Frontend | `http://localhost:3000` |
-   | Postgres | `postgres://app:app@localhost:5432/app` (Compose only) |
+   | Frontend | `http://localhost:3000` (stub until `frontend/Dockerfile`) |
+   | Postgres | `postgres://app:changeme-local-only@localhost:5432/app` (Compose only) |
    | Redis | `redis://localhost:6379/0` |
 
-Compose currently uses **stubs** where app Dockerfiles are not filled yet; see comments in `docker-compose.yml`. Replace stub images as `backend/` and `frontend/` land.
+Compose builds the real FastAPI image from `backend/`. Frontend remains an http-echo stub until `frontend/Dockerfile` lands.
 
 ## Environment
 
