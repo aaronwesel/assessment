@@ -257,6 +257,31 @@ code {
   font-size: 0.95rem;
 }
 
+.mfa-panel {
+  margin: 1.5rem 0;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+
+.mfa-panel h2 {
+  font-family: var(--display);
+  font-size: 1.35rem;
+  margin: 0 0 0.5rem;
+}
+
+.mfa-secret-block {
+  margin: 0.75rem 0 1rem;
+}
+
+.mfa-code {
+  display: block;
+  word-break: break-all;
+  font-size: 0.8rem;
+  background: var(--bg-accent);
+  padding: 0.5rem 0.65rem;
+  border-radius: var(--radius);
+}
+
 @media (max-width: 480px) {
   .nav {
     padding: 0.75rem 1rem;

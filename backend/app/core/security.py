@@ -6,9 +6,15 @@ Auth model:
 - Refresh tokens rotate on use; old refresh `jti` is blacklisted.
 - Each issued token stores `session:{type}:{jti}` in Redis until expiry so logout
   can drop live sessions without waiting for natural JWT expiry alone.
+- Refresh also requires the session registry entry (`require_session=True`).
+
+Password hashing: bcrypt (Argon2id is an acceptable later upgrade). Never log plaintext.
+
+Cookie / JWT transport (SPA): Bearer JWTs in Authorization today. If cookies are
+added later: HttpOnly, Secure (non-local), SameSite=Strict|Lax. Never put PHI in claims.
 
 HIPAA: never put PHI (emails, names, medical fields) in JWT claims — only opaque
-subject ids and role strings. Passwords use bcrypt; plaintext never logged.
+subject ids and role strings.
 """
 
 from __future__ import annotations
@@ -27,7 +33,7 @@ TokenType = Literal["access", "refresh"]
 
 
 def hash_password(password: str) -> str:
-    """One-way bcrypt hash for password accounts (federated users leave this null)."""
+    """One-way bcrypt hash for password accounts (federated users leave this null). Max length enforced at API boundary."""
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
@@ -44,7 +50,7 @@ def _create_token(
     expires_delta: timedelta,
     extra_claims: dict[str, Any] | None = None,
 ) -> tuple[str, str, int]:
-    """Return (encoded_jwt, jti, ttl_seconds)."""
+    """Return (encoded_jwt, jti, ttl_seconds). Never put PHI in claims."""
     settings = get_settings()
     now = datetime.now(UTC)
     jti = str(uuid4())
@@ -57,7 +63,6 @@ def _create_token(
         "exp": now + expires_delta,
     }
     if extra_claims:
-        # Never put PHI in JWT claims.
         payload.update(extra_claims)
     encoded = jwt.encode(payload, settings.secret_key, algorithm=settings.jwt_algorithm)
     return encoded, jti, ttl_seconds
@@ -93,10 +98,13 @@ def decode_token(
     expected_type: TokenType | None = None,
     *,
     check_blacklist: bool = True,
+    require_session: bool = False,
 ) -> dict[str, Any]:
     """
     Verify signature/expiry and optionally reject Redis-blacklisted jtis.
 
+    ``require_session=True`` also demands the Redis session registry entry
+    (used for refresh rotation so revoked tokens cannot be replayed).
     Raises ValueError for invalid/revoked tokens (routes map this to 401).
     """
     settings = get_settings()
@@ -107,8 +115,13 @@ def decode_token(
     if expected_type and payload.get("type") != expected_type:
         raise ValueError("Unexpected token type")
     jti = payload.get("jti")
-    if check_blacklist and jti and get_redis().is_blacklisted(str(jti)):
+    redis = get_redis()
+    if check_blacklist and jti and redis.is_blacklisted(str(jti)):
         raise ValueError("Token revoked")
+    if require_session and jti:
+        token_type = str(payload.get("type") or expected_type or "access")
+        if not redis.has_session(token_type, str(jti)):
+            raise ValueError("Session expired or revoked")
     return payload
 
 

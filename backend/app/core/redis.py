@@ -5,11 +5,11 @@ Production (ElastiCache) stores:
 - `session:access:{jti}` / `session:refresh:{jti}` — live token registry
 - `blacklist:{jti}` — revoked tokens until natural expiry
 - `ratelimit:{client}:{bucket}` — fixed-window counters (cross-task when sticky OFF)
+- `login:fail:*` / `login:lock:*` — password abuse counters (opaque email hashes)
 
-Local/dev: if Redis is unreachable we keep an in-memory stub so auth still works
-in unit tests and laptop Compose without failing boot. Do not log connection
-URLs (may embed passwords). HIPAA: Redis must never hold PHI payloads — only
-opaque ids and flags.
+Refresh requires the session key to still exist (replay after revoke fails).
+Local/dev: in-memory stub if Redis unreachable. Do not log connection URLs.
+HIPAA: Redis must never hold PHI payloads — only opaque ids and flags.
 """
 
 from __future__ import annotations
@@ -68,13 +68,13 @@ class RedisClientStub:
         self._store.pop(key, None)
 
     def incr(self, key: str, ex: int | None = None) -> int:
-        """Atomic-ish counter for rate limits (Redis INCR; stub increments locally)."""
+        """Atomic increment for rate-limit counters. Sets TTL on first create when ``ex`` given."""
         if self._client is not None:
             value = int(self._client.incr(key))
             if ex is not None and value == 1:
                 self._client.expire(key, ex)
             return value
-        current = int(self._store.get(key, "0")) + 1
+        current = int(self._store.get(key, "0") or "0") + 1
         self._store[key] = str(current)
         return current
 
@@ -84,6 +84,10 @@ class RedisClientStub:
 
     def is_blacklisted(self, jti: str) -> bool:
         return self.get(f"blacklist:{jti}") is not None
+
+    def has_session(self, token_type: str, jti: str) -> bool:
+        """True if the session registry still tracks this jti (used on refresh)."""
+        return self.get(f"session:{token_type}:{jti}") is not None
 
 
 _redis_stub: RedisClientStub | None = None
@@ -96,3 +100,9 @@ def get_redis() -> RedisClientStub:
         _redis_stub = RedisClientStub()
         _redis_stub.connect()
     return _redis_stub
+
+
+def reset_redis_for_tests() -> None:
+    """Drop the singleton so tests get a fresh in-memory store."""
+    global _redis_stub
+    _redis_stub = None

@@ -94,12 +94,12 @@ def test_maybe_send_login_alert_uses_stub_when_enabled() -> None:
 def test_login_route_still_works_with_alert_flag_off(client) -> None:
     register = client.post(
         "/api/v1/auth/register",
-        json={"email": "login-alert@example.com", "password": "securepass1"},
+        json={"email": "login-alert@example.com", "password": "SecurePass1!x"},
     )
     assert register.status_code == 201
     login = client.post(
         "/api/v1/auth/login",
-        json={"email": "login-alert@example.com", "password": "securepass1"},
+        json={"email": "login-alert@example.com", "password": "SecurePass1!x"},
     )
     assert login.status_code == 200
     assert "access_token" in login.json()

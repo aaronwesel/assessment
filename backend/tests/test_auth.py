@@ -43,7 +43,7 @@ def test_register_login_refresh_and_me(client: TestClient) -> None:
         "/api/v1/auth/register",
         json={
             "email": "user@example.com",
-            "password": "securepass1",
+            "password": "SecurePass1!x",
             "full_name": "Test User",
         },
     )
@@ -64,7 +64,7 @@ def test_register_login_refresh_and_me(client: TestClient) -> None:
 
     login = client.post(
         "/api/v1/auth/login",
-        json={"email": "user@example.com", "password": "securepass1"},
+        json={"email": "user@example.com", "password": "SecurePass1!x"},
     )
     assert login.status_code == 200
 
@@ -93,7 +93,7 @@ def test_register_login_refresh_and_me(client: TestClient) -> None:
 def test_login_rejects_bad_password(client: TestClient) -> None:
     client.post(
         "/api/v1/auth/register",
-        json={"email": "other@example.com", "password": "securepass1"},
+        json={"email": "other@example.com", "password": "SecurePass1!x"},
     )
     bad = client.post(
         "/api/v1/auth/login",
@@ -103,7 +103,7 @@ def test_login_rejects_bad_password(client: TestClient) -> None:
 
 
 def test_duplicate_register_conflicts(client: TestClient) -> None:
-    payload = {"email": "dupe@example.com", "password": "securepass1"}
+    payload = {"email": "dupe@example.com", "password": "SecurePass1!x"}
     assert client.post("/api/v1/auth/register", json=payload).status_code == 201
     assert client.post("/api/v1/auth/register", json=payload).status_code == 409
 
@@ -111,7 +111,7 @@ def test_duplicate_register_conflicts(client: TestClient) -> None:
 def test_user_denied_admin_route(client: TestClient) -> None:
     register = client.post(
         "/api/v1/auth/register",
-        json={"email": "plain@example.com", "password": "securepass1"},
+        json={"email": "plain@example.com", "password": "SecurePass1!x"},
     )
     assert register.status_code == 201
     token = register.json()["access_token"]
@@ -126,7 +126,7 @@ def test_user_denied_admin_route(client: TestClient) -> None:
 def test_logout_blacklists_access_token(client: TestClient) -> None:
     register = client.post(
         "/api/v1/auth/register",
-        json={"email": "logout@example.com", "password": "securepass1"},
+        json={"email": "logout@example.com", "password": "SecurePass1!x"},
     )
     tokens = register.json()
     access = tokens["access_token"]

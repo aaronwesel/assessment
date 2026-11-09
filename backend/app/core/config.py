@@ -55,6 +55,27 @@ class Settings(BaseSettings):
     )
     jwt_algorithm: str = "HS256"
 
+    # Field-level Fernet key (base64 url-safe 32-byte or any secret we derive from).
+    # Production: set via Secrets Manager. Empty → derive from secret_key (local/test only).
+    field_encryption_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("FIELD_ENCRYPTION_KEY", "FERNET_KEY"),
+    )
+
+    # Login abuse controls (Redis). Tunable without code changes.
+    login_max_failures: int = Field(default=5, validation_alias="LOGIN_MAX_FAILURES")
+    login_failure_window_seconds: int = Field(
+        default=900,
+        validation_alias="LOGIN_FAILURE_WINDOW_SECONDS",
+    )
+    login_lockout_seconds: int = Field(
+        default=900,
+        validation_alias="LOGIN_LOCKOUT_SECONDS",
+    )
+
+    # MFA: when true, password users with mfa_enabled must send totp_code on login.
+    mfa_issuer: str = Field(default="Assessment", validation_alias="MFA_ISSUER")
+
     database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/assessment"
     redis_url: str = "redis://localhost:6379/0"
 

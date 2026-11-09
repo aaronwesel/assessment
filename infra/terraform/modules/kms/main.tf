@@ -5,6 +5,10 @@ data "aws_caller_identity" "current" {}
 data "aws_partition" "current" {}
 data "aws_region" "current" {}
 
+# Primary CMK for RDS, Redis, Secrets Manager, CloudWatch Logs, ECR.
+# Assessment day: also use this (or a dedicated key) for any S3 buckets
+# (audit exports, object PHI) with SSE-KMS — see versions.tf remote-state note.
+# Never commit plaintext key material; AWS manages the CMK.
 resource "aws_kms_key" "primary" {
   description             = "${var.name_prefix} primary CMK (RDS, Redis, Secrets, logs)"
   deletion_window_in_days = 30

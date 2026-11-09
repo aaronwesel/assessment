@@ -41,6 +41,18 @@ _SENSITIVE_KEYS = frozenset(
         "prompt",
         "content",
         "body",
+        # MFA / crypto — never log secrets, codes, or recovery material.
+        "mfa_secret",
+        "totp",
+        "totp_code",
+        "otp",
+        "otpauth",
+        "backup_code",
+        "backup_codes",
+        "secret",
+        "field_encryption_key",
+        "fernet_key",
+        "cookie",
     }
 )
 

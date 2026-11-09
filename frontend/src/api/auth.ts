@@ -35,6 +35,7 @@ export type ProvidersStatus = {
   password: boolean
   ses_enabled: boolean
   login_alert_email_enabled: boolean
+  mfa_available?: boolean
 }
 
 export async function fetchProviders(): Promise<ProvidersStatus> {
@@ -64,14 +65,84 @@ export async function registerPassword(input: {
 export async function loginPassword(input: {
   email: string
   password: string
+  totpCode?: string
+  backupCode?: string
 }): Promise<AuthTokens> {
   const response = await fetch(apiUrl('/api/v1/auth/login'), {
     method: 'POST',
     headers: jsonHeaders,
-    body: JSON.stringify(input),
+    body: JSON.stringify({
+      email: input.email,
+      password: input.password,
+      totp_code: input.totpCode || null,
+      backup_code: input.backupCode || null,
+    }),
   })
   if (!response.ok) throw new Error(await readErrorMessage(response))
   return response.json() as Promise<AuthTokens>
+}
+
+export async function fetchMfaStatus(accessToken: string): Promise<{ mfa_enabled: boolean }> {
+  const response = await fetch(apiUrl('/api/v1/auth/mfa/status'), {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+  if (!response.ok) throw new Error(await readErrorMessage(response))
+  return response.json() as Promise<{ mfa_enabled: boolean }>
+}
+
+export async function enrollMfa(
+  accessToken: string,
+): Promise<{ secret: string; otpauth_uri: string }> {
+  const response = await fetch(apiUrl('/api/v1/auth/mfa/enroll'), {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, ...jsonHeaders },
+  })
+  if (!response.ok) throw new Error(await readErrorMessage(response))
+  return response.json() as Promise<{ secret: string; otpauth_uri: string }>
+}
+
+export async function confirmMfa(
+  accessToken: string,
+  totpCode: string,
+): Promise<{ mfa_enabled: boolean; backup_codes: string[] }> {
+  const response = await fetch(apiUrl('/api/v1/auth/mfa/confirm'), {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, ...jsonHeaders },
+    body: JSON.stringify({ totp_code: totpCode }),
+  })
+  if (!response.ok) throw new Error(await readErrorMessage(response))
+  return response.json() as Promise<{ mfa_enabled: boolean; backup_codes: string[] }>
+}
+
+export async function verifyMfa(
+  accessToken: string,
+  input: { totpCode?: string; backupCode?: string },
+): Promise<{ ok: boolean }> {
+  const response = await fetch(apiUrl('/api/v1/auth/mfa/verify'), {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, ...jsonHeaders },
+    body: JSON.stringify({
+      totp_code: input.totpCode || null,
+      backup_code: input.backupCode || null,
+    }),
+  })
+  if (!response.ok) throw new Error(await readErrorMessage(response))
+  return response.json() as Promise<{ ok: boolean }>
+}
+
+export async function disableMfa(
+  accessToken: string,
+  input: { totpCode?: string; backupCode?: string },
+): Promise<void> {
+  const response = await fetch(apiUrl('/api/v1/auth/mfa/disable'), {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, ...jsonHeaders },
+    body: JSON.stringify({
+      totp_code: input.totpCode || null,
+      backup_code: input.backupCode || null,
+    }),
+  })
+  if (!response.ok) throw new Error(await readErrorMessage(response))
 }
 
 export async function exchangeOneTap(

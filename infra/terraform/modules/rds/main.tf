@@ -26,6 +26,8 @@ resource "aws_rds_cluster" "this" {
   db_subnet_group_name   = aws_db_subnet_group.this.name
   vpc_security_group_ids = [var.security_group_id]
 
+  # Encryption at rest (HIPAA-ready): AES via customer CMK — do not disable.
+  # In-transit: require SSL on assessment-day DATABASE_URL (sslmode=require).
   storage_encrypted = true
   kms_key_id        = var.kms_key_arn
 
