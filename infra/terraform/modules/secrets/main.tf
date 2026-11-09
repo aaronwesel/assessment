@@ -1,4 +1,6 @@
 # Secret shells only — never commit real values. Populate on assessment day.
+# KMS-encrypted Secrets Manager entries feed ECS task secrets (JWT, DB, Redis,
+# optional Slack webhook). HIPAA: rotate values; keep PHI out of secret JSON keys.
 
 resource "aws_secretsmanager_secret" "app" {
   name       = "${var.name_prefix}/app"

@@ -14,8 +14,9 @@ Load balancing:
   when ALB sticky sessions are OFF.
 
 HIPAA / safety defaults:
-- DeepSeek, Rekognition, and SES are OFF unless explicitly enabled.
+- DeepSeek, Rekognition, SES, and Slack are OFF unless explicitly enabled.
 - Login-alert recipients are ops mailboxes, not end-user PHI destinations.
+- Slack webhook bodies must stay PHI-free (opaque ids + event codes only).
 """
 
 from functools import lru_cache

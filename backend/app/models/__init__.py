@@ -1,4 +1,4 @@
-"""SQLModel tables for accounts — import here so Alembic/metadata discover them."""
+"""SQLModel tables for accounts + team parceling — import for Alembic/metadata."""
 
 from app.models.account_link import AccountLink, IdentityProvider
 from app.models.organization import Organization
