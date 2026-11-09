@@ -1,0 +1,27 @@
+name: AssessmentApp
+options:
+  bundleIdPrefix: com.assessment
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    TARGETED_DEVICE_FAMILY: "1,2"
+targets:
+  AssessmentApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: AssessmentApp
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.assessment.app
+        INFOPLIST_FILE: AssessmentApp/Info.plist
+        GENERATE_INFOPLIST_FILE: false
+        CURRENT_PROJECT_VERSION: 1
+        MARKETING_VERSION: "0.1.0"
+    info:
+      path: AssessmentApp/Info.plist
+      properties:
+        UILaunchScreen: {}
