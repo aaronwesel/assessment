@@ -125,27 +125,38 @@ module "redis" {
 module "ecs" {
   source = "./modules/ecs"
 
-  name_prefix           = local.name_prefix
-  private_subnet_ids    = module.vpc.private_subnet_ids
-  ecs_security_group_id = module.security.ecs_security_group_id
-  api_target_group_arn  = module.alb.api_target_group_arn
-  api_image             = "${module.ecr.api_repository_url}:${var.api_image_tag}"
-  worker_image          = "${module.ecr.worker_repository_url}:${var.worker_image_tag}"
-  api_cpu               = var.api_cpu
-  api_memory            = var.api_memory
-  worker_cpu            = var.worker_cpu
-  worker_memory         = var.worker_memory
-  api_desired_count     = var.api_desired_count
-  worker_desired_count  = var.worker_desired_count
-  execution_role_arn    = module.iam.execution_role_arn
-  task_role_arn         = module.iam.task_role_arn
-  api_log_group_name    = module.cloudwatch.api_log_group_name
-  worker_log_group_name = module.cloudwatch.worker_log_group_name
-  aws_region            = var.aws_region
-  app_secret_arn        = module.secrets.app_secret_arn
-  db_secret_arn         = module.secrets.db_secret_arn
-  redis_secret_arn      = module.secrets.redis_secret_arn
-  tags                  = local.common_tags
+  name_prefix                  = local.name_prefix
+  private_subnet_ids           = module.vpc.private_subnet_ids
+  ecs_security_group_id        = module.security.ecs_security_group_id
+  api_target_group_arn         = module.alb.api_target_group_arn
+  api_target_group_arn_suffix  = module.alb.api_target_group_arn_suffix
+  alb_arn_suffix               = module.alb.alb_arn_suffix
+  api_image                    = "${module.ecr.api_repository_url}:${var.api_image_tag}"
+  worker_image                 = "${module.ecr.worker_repository_url}:${var.worker_image_tag}"
+  api_cpu                      = var.api_cpu
+  api_memory                   = var.api_memory
+  worker_cpu                   = var.worker_cpu
+  worker_memory                = var.worker_memory
+  api_desired_count            = var.api_desired_count
+  worker_desired_count         = var.worker_desired_count
+  api_min_capacity             = var.api_min_capacity
+  api_max_capacity             = var.api_max_capacity
+  worker_min_capacity          = var.worker_min_capacity
+  worker_max_capacity          = var.worker_max_capacity
+  api_cpu_target_percent       = var.api_cpu_target_percent
+  api_memory_target_percent    = var.api_memory_target_percent
+  api_requests_per_target      = var.api_requests_per_target
+  worker_cpu_target_percent    = var.worker_cpu_target_percent
+  worker_memory_target_percent = var.worker_memory_target_percent
+  execution_role_arn           = module.iam.execution_role_arn
+  task_role_arn                = module.iam.task_role_arn
+  api_log_group_name           = module.cloudwatch.api_log_group_name
+  worker_log_group_name        = module.cloudwatch.worker_log_group_name
+  aws_region                   = var.aws_region
+  app_secret_arn               = module.secrets.app_secret_arn
+  db_secret_arn                = module.secrets.db_secret_arn
+  redis_secret_arn             = module.secrets.redis_secret_arn
+  tags                         = local.common_tags
 }
 
 module "waf" {

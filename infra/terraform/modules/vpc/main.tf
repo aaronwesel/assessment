@@ -1,3 +1,7 @@
+# Multi-AZ sketch: public + private subnets per availability_zones entry.
+# ALB needs ≥2 public AZs; ECS/RDS/Redis use matching private AZs for HA.
+# See docs/load-balancing.md.
+
 resource "aws_vpc" "this" {
   cidr_block           = var.cidr_block
   enable_dns_hostnames = true

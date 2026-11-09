@@ -55,6 +55,17 @@ class RedisClientStub:
             return
         self._store.pop(key, None)
 
+    def incr(self, key: str, ex: int | None = None) -> int:
+        """Atomic-ish counter for rate limits (Redis INCR; stub increments locally)."""
+        if self._client is not None:
+            value = int(self._client.incr(key))
+            if ex is not None and value == 1:
+                self._client.expire(key, ex)
+            return value
+        current = int(self._store.get(key, "0")) + 1
+        self._store[key] = str(current)
+        return current
+
     def blacklist_token(self, jti: str, ttl_seconds: int) -> None:
         self.set(f"blacklist:{jti}", "1", ex=ttl_seconds)
 

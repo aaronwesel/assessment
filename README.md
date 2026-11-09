@@ -59,6 +59,7 @@ GitHub Actions (`.github/workflows/`):
 
 - [HIPAA engineering checklist](docs/hipaa-checklist.md) — required controls before calling anything complete (not a certification claim)
 - [Assessment-day runbook](docs/assessment-day-runbook.md) — parallel streams, health gates, demo order
+- [Load balancing & scaling](docs/load-balancing.md) — ALB fan-out, API vs worker autoscaling
 
 ## Explicit non-goals (prep)
 

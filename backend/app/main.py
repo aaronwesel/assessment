@@ -11,6 +11,8 @@ from app.api.routes import health
 from app.core.config import get_settings
 from app.core.logging import get_logger, log_event
 from app.core.redis import get_redis
+from app.middleware.rate_limit import RateLimitMiddleware
+from app.middleware.request_id import RequestIdMiddleware
 from app.middleware.security_headers import SecurityHeadersMiddleware
 
 logger = get_logger(__name__)
@@ -53,10 +55,14 @@ def create_app() -> FastAPI:
         allow_origins=settings.cors_origin_list,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type"],
+        allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+        expose_headers=["X-Request-ID"],
     )
+    # Order: last added runs first on request. Request ID wraps everything.
     application.add_middleware(SecurityHeadersMiddleware)
-    # Root health for ALB/ECS probes.
+    application.add_middleware(RateLimitMiddleware)
+    application.add_middleware(RequestIdMiddleware)
+    # Root health for ALB/ECS probes (/health liveness, /health/ready deps).
     application.include_router(health.router)
     application.include_router(api_router, prefix=settings.api_v1_prefix)
     return application

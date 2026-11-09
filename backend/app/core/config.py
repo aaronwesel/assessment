@@ -88,6 +88,11 @@ class Settings(BaseSettings):
     login_alert_email_enabled: bool = False
     login_alert_to_email: str = ""  # comma-separated ops mailboxes; not end-user PHI
 
+    # Optional Redis-backed rate limit (cross-task; sticky sessions are OFF)
+    rate_limit_enabled: bool = False
+    rate_limit_requests: int = 120
+    rate_limit_window_seconds: int = 60
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

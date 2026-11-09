@@ -35,9 +35,9 @@ Optional plan dry-run (still no apply; requires AWS creds and filled tfvars — 
 | KMS CMKs | `modules/kms` | RDS, Redis, Secrets, CloudWatch logs |
 | VPC | `modules/vpc` | Public + private subnets; NAT sketch |
 | Security groups | `modules/security` | ALB → ECS → DB/Redis least privilege |
-| ALB + TLS | `modules/alb` | HTTPS listener; ACM cert ARN variable |
+| ALB + TLS | `modules/alb` | HTTPS; API TG; stickiness OFF; multi-AZ notes |
 | ECR | `modules/ecr` | API + worker repos; scan on push |
-| ECS Fargate | `modules/ecs` | API service + worker service |
+| ECS Fargate | `modules/ecs` | API + worker; desired_count + App Autoscaling (CPU/mem/requests) |
 | Aurora/RDS Postgres | `modules/rds` | Private; storage encrypted; SSL |
 | ElastiCache Redis | `modules/redis` | Private; at-rest + in-transit encryption |
 | Secrets Manager | `modules/secrets` | App/DB/Redis secret shells (no values committed) |
@@ -58,6 +58,15 @@ cp environments/prod.tfvars.example environments/prod.tfvars
 ## Rekognition
 
 The ECS **task role** includes an IAM permission sketch for Amazon Rekognition APIs (labels / moderation / detect text as needed). Prefer task-role credentials over long-lived access keys in the app.
+
+## Load balancing & autoscaling
+
+See [`docs/load-balancing.md`](../../docs/load-balancing.md). Summary:
+
+- ALB fans out to API tasks only (`target_type=ip`, **sticky sessions disabled**).
+- API autoscales on CPU, memory, and `ALBRequestCountPerTarget`.
+- Workers autoscale on CPU/memory only (no ALB) — raise worker capacity for async backlog, not HTTP traffic.
+- ALB health check path is `/health` (liveness); `/health/ready` is for deploy gates.
 
 ## SES (alerts)
 

@@ -1,6 +1,6 @@
 # Backend (FastAPI)
 
-HIPAA-minded FastAPI API: JWT access/refresh (+ Redis session/blacklist), password register/login, Google One Tap + Microsoft MSAL ID-token exchange, RBAC, Redis client, DeepSeek (off) + Rekognition stubs, Amazon SES alert client (off) with PHI-free templates, Alembic, health probes.
+HIPAA-minded FastAPI API: JWT access/refresh (+ Redis session/blacklist), password register/login, Google One Tap + Microsoft MSAL ID-token exchange, RBAC, Redis client, DeepSeek (off) + Rekognition stubs, Amazon SES alert client (off) with PHI-free templates, Alembic, LB-oriented health/readiness, `X-Request-ID` middleware, optional Redis rate limit.
 
 ## Quick start
 
@@ -37,6 +37,15 @@ pytest -q
 ```
 
 Google/Microsoft verifiers are unit-tested with mocked google-auth / JWKS. SES alert tests live in `tests/test_ses_alerts.py`.
+
+## Load balancer probes
+
+| Path | Use |
+|------|-----|
+| `GET /health` | ALB/ECS liveness (cheap) |
+| `GET /health/ready` | Readiness (`503` if deps down in non-local) |
+
+Responses include `X-Request-ID`. Optional rate limit: `RATE_LIMIT_ENABLED=true` (Redis-backed across tasks; health paths exempt). See `docs/load-balancing.md`.
 
 ## Notes
 
