@@ -14,6 +14,8 @@
   --accent: #4d9fff;
   --accent-glow: color-mix(in srgb, var(--accent) 45%, transparent);
   --danger: #ff8a8a;
+  --success: #00e5b8;
+  --warn: #e6c35c;
   --radius: 10px;
   --font: "IBM Plex Sans", "Segoe UI", sans-serif;
   --display: "DM Serif Display", Georgia, serif;
@@ -894,6 +896,26 @@ code {
   text-transform: uppercase;
   color: var(--primary);
   font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.crawl-brand-mark {
+  display: block;
+  border-radius: 5px;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 25%, transparent);
+  animation: crawl-rise 0.7s ease-out both;
+}
+
+.crawl-job-id {
+  font-size: 0.82rem;
+  word-break: break-all;
+}
+
+.crawl-poll-hint.is-signalr {
+  color: var(--success);
+  font-weight: 600;
 }
 
 .crawl-console-title {
@@ -1198,6 +1220,15 @@ code {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
+}
+
+.crawl-background-hint {
+  margin: 0.75rem 0 0;
+  padding: 0.65rem 0.85rem;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--primary) 35%, var(--line));
+  background: color-mix(in srgb, var(--primary) 8%, var(--bg-accent));
+  line-height: 1.45;
 }
 
 .crawl-badge {

@@ -7,6 +7,7 @@ import {
   type CrawlAdvancedOptions,
   saveAdvancedToStorage,
 } from './crawlAdvancedOptions'
+import { ABSOLUTE_MAX_PAGES } from './crawlLimits'
 
 type Props = {
   open: boolean
@@ -66,11 +67,11 @@ export function AdvancedOptionsDrawer({ open, onClose, value, onChange }: Props)
           <p className="hint">How many link hops from the seed URL.</p>
 
           <label className="field">
-            <span>Max pages (1–200)</span>
+            <span>Max pages (1–{ABSOLUTE_MAX_PAGES})</span>
             <input
               type="number"
               min={1}
-              max={200}
+              max={ABSOLUTE_MAX_PAGES}
               value={draft.maxPages}
               onChange={(e) => patch({ maxPages: Number(e.target.value) })}
             />

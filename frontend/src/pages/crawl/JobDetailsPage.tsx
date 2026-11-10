@@ -1,5 +1,5 @@
 /**
- * Job Details — live progress, actionable report, tree + DLR, export, element pick, AI assist.
+ * Job Details — live progress (SignalR + poll fallback), Trailmap guided chrome, tree + DLR.
  */
 import { useCallback, useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
@@ -27,7 +27,10 @@ import { StatusBadge } from '../../components/crawl/StatusBadge'
 import { AiAssistPanels, IncidentsPanel } from '../../crawl/ai/AiAssistPanels'
 import type { CrawlPageSnapshot } from '../../crawl/ai/crawlAiApi'
 import { formatDateTime } from '../../crawl/format'
-import { JOB_DETAILS_POLL_MS, useJobLiveRefresh } from '../../crawl/useJobLiveRefresh'
+import {
+  useJobLiveRefresh,
+  type RealtimeMode,
+} from '../../crawl/useJobLiveRefresh'
 
 export function JobDetailsPage() {
   const { jobId = '' } = useParams()
@@ -39,7 +42,6 @@ export function JobDetailsPage() {
   const [treeLoading, setTreeLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const liveStatus = job?.status
 
   const loadJob = useCallback(
     async (opts?: { silent?: boolean }) => {
@@ -88,7 +90,20 @@ export function JobDetailsPage() {
     [jobId],
   )
 
-  useJobLiveRefresh({ jobId, liveStatus, loadJob, loadTree })
+  const setJobFromRealtime = useCallback(
+    (updater: (prev: CrawlJob | null) => CrawlJob | null) => {
+      setJob(updater)
+    },
+    [],
+  )
+
+  const { mode: realtimeMode } = useJobLiveRefresh({
+    jobId,
+    job,
+    setJob: setJobFromRealtime,
+    loadJob,
+    loadTree,
+  })
 
   const live = !!job && isActiveJobStatus(job.status)
   const terminal = !!job && !isActiveJobStatus(job.status)
@@ -101,7 +116,7 @@ export function JobDetailsPage() {
       title="Job details"
       lede={
         live
-          ? 'Live crawl — report and tree update as pages finish.'
+          ? 'Live crawl — workers keep running if you leave this page. Reopen from History anytime.'
           : 'Crawl report, exports, Domain Link Ratio tree, and AI assist.'
       }
       wide
@@ -133,37 +148,42 @@ export function JobDetailsPage() {
 
           <div className="crawl-details-guided-row">
             <div className="crawl-details-primary">
-          <JobSummary job={job} live={live} onCanceled={() => void loadJob()} />
-
-          <JobResultsHub job={job} root={root} terminal={terminal} />
-
-          <section className="crawl-panel-block crawl-ai-wrap" aria-label="Crawl incidents">
-            <IncidentsPanel jobId={job.jobId} />
-          </section>
-
-          <JobTreeSection
-            jobId={job.jobId}
-            live={live}
-            root={root}
-            loading={treeLoading}
-            error={treeError}
-            onRetry={() => void loadTree()}
-          />
-
-          {root ? <ElementPickExport jobId={job.jobId} root={root} /> : null}
-
-          {pages.length > 0 ? (
-            <section className="crawl-panel-block crawl-ai-wrap" aria-label="Assistive AI">
-              <AiAssistPanels
-                jobId={job.jobId}
-                seedUrl={job.url}
-                status={job.status}
-                pages={pages}
-                pageCount={job.pageCounts.total}
-                edgeCount={pages.length}
+              <JobSummary
+                job={job}
+                live={live}
+                realtimeMode={realtimeMode}
+                onCanceled={() => void loadJob()}
               />
-            </section>
-          ) : null}
+
+              <JobResultsHub job={job} root={root} terminal={terminal} />
+
+              <section className="crawl-panel-block crawl-ai-wrap" aria-label="Crawl incidents">
+                <IncidentsPanel jobId={job.jobId} />
+              </section>
+
+              <JobTreeSection
+                jobId={job.jobId}
+                live={live}
+                root={root}
+                loading={treeLoading}
+                error={treeError}
+                onRetry={() => void loadTree()}
+              />
+
+              {root ? <ElementPickExport jobId={job.jobId} root={root} /> : null}
+
+              {pages.length > 0 ? (
+                <section className="crawl-panel-block crawl-ai-wrap" aria-label="Assistive AI">
+                  <AiAssistPanels
+                    jobId={job.jobId}
+                    seedUrl={job.url}
+                    status={job.status}
+                    pages={pages}
+                    pageCount={job.pageCounts.total}
+                    edgeCount={pages.length}
+                  />
+                </section>
+              ) : null}
             </div>
             <DeepSeekGuide
               step={live ? 4 : 5}
@@ -178,17 +198,34 @@ export function JobDetailsPage() {
   )
 }
 
+function realtimeHint(mode: RealtimeMode, live: boolean): string {
+  if (!live) return ''
+  switch (mode) {
+    case 'live':
+      return 'Live via SignalR (disconnect only pauses this view)'
+    case 'connecting':
+      return 'Connecting realtime…'
+    case 'polling':
+      return 'Polling REST (job still runs server-side)'
+    default:
+      return ''
+  }
+}
+
 function JobSummary({
   job,
   live,
+  realtimeMode,
   onCanceled,
 }: {
   job: CrawlJob
   live: boolean
+  realtimeMode: RealtimeMode
   onCanceled: () => void
 }) {
   const [cancelPending, setCancelPending] = useState(false)
   const [cancelError, setCancelError] = useState<string | null>(null)
+  const hint = realtimeHint(realtimeMode, live)
 
   const cancel = async () => {
     setCancelPending(true)
@@ -222,6 +259,12 @@ function JobSummary({
 
       <dl className="crawl-fact-grid">
         <div>
+          <dt>Job ID</dt>
+          <dd>
+            <code className="crawl-job-id">{job.jobId}</code>
+          </dd>
+        </div>
+        <div>
           <dt>Limits</dt>
           <dd>
             depth {job.maxDepth} · up to {job.maxPages} pages
@@ -253,6 +296,14 @@ function JobSummary({
         live={live}
       />
 
+      {live ? (
+        <p className="crawl-background-hint hint" role="status">
+          Workers run on RabbitMQ until this job completes or you press <strong>Cancel job</strong>. Navigating to{' '}
+          <Link to="/crawl/history">History</Link> or starting another crawl does not stop this run — reopen this job for
+          live status.
+        </p>
+      ) : null}
+
       <div className="crawl-summary-actions">
         {live ? (
           <button
@@ -268,10 +319,12 @@ function JobSummary({
             Run guided retry
           </Link>
         )}
-        {live ? (
-          <span className="hint crawl-poll-hint">
+        {live && hint ? (
+          <span
+            className={`hint crawl-poll-hint${realtimeMode === 'live' ? ' is-signalr' : ''}`}
+          >
             <span className="crawl-live-dot" aria-hidden="true" />
-            Live updates every {JOB_DETAILS_POLL_MS / 1000}s
+            {hint}
           </span>
         ) : null}
       </div>
@@ -320,7 +373,7 @@ function JobTreeSection({
       {!loading && !error && !root ? (
         <CrawlEmpty title="No pages in tree yet" actionTo="/crawl/welcome" actionLabel="Try wizard">
           {live
-            ? 'The worker is still fetching the seed page — keep this tab open.'
+            ? 'The worker is still fetching the seed page. Browse away freely — reopen this job from History for live updates.'
             : 'The job finished without a crawlable root page. Use the crawl report above for diagnosis.'}
         </CrawlEmpty>
       ) : null}

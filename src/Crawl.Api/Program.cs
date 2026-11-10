@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using Crawl.Ai;
 using Crawl.Api.Jobs;
+using Crawl.Api.Ops;
+using Crawl.Api.Realtime;
 using Crawl.Infrastructure;
 using Crawl.Infrastructure.Messaging;
 using Crawl.Infrastructure.Persistence;
@@ -29,6 +31,8 @@ try
     // Assistive AI overlays — additive; never owns link parse / Domain Link Ratio.
     builder.Services.AddCrawlAi(builder.Configuration);
     builder.Services.AddScoped<JobService>();
+    builder.Services.AddSignalR();
+    builder.Services.AddHostedService<JobProgressRelayService>();
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(options =>
     {
@@ -59,10 +63,15 @@ try
                 t.AddOtlpExporter();
         });
 
+    // SignalR needs AllowCredentials → cannot use AllowAnyOrigin. Reflect request origin for local/Compose demos.
     builder.Services.AddCors(options =>
     {
         options.AddDefaultPolicy(policy =>
-            policy.AllowAnyHeader().AllowAnyMethod().AllowAnyOrigin());
+            policy
+                .SetIsOriginAllowed(_ => true)
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .AllowCredentials());
     });
 
     var app = builder.Build();
@@ -70,7 +79,9 @@ try
     using (var scope = app.Services.CreateScope())
     {
         var db = scope.ServiceProvider.GetRequiredService<CrawlDbContext>();
-        await db.Database.MigrateAsync();
+        var migrateLog = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("CrawlDbMigrator");
+        // Safe under concurrent API + worker startups (advisory lock + retry).
+        await CrawlDbMigrator.MigrateSafeAsync(db, migrateLog);
     }
 
     app.UseSerilogRequestLogging();
@@ -161,6 +172,8 @@ try
         .WithOpenApi();
 
     app.MapCrawlAi();
+    app.MapScaleSignals();
+    app.MapHub<CrawlJobHub>("/hubs/crawl-jobs");
 
     app.MapHealthChecks("/health");
     app.MapGet("/", () => Results.Redirect("/swagger"));
