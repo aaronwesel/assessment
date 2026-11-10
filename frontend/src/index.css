@@ -1626,6 +1626,35 @@ code {
   margin-top: 0.75rem;
 }
 
+.crawl-step5-running {
+  border-left: 3px solid var(--primary);
+  background: color-mix(in srgb, var(--bg-accent) 55%, white);
+}
+
+.crawl-step6-export-card {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem;
+  margin-bottom: 0.5rem;
+  background: color-mix(in srgb, var(--primary) 8%, white);
+}
+
+.crawl-step6-export-title {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+}
+
+.crawl-step6-export-lede {
+  margin: 0 0 0.75rem;
+}
+
+.crawl-step6-export-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 .crawl-wizard-steps {
   display: flex;
   flex-wrap: wrap;

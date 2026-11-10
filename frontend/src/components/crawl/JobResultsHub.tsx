@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
 import type { CrawlJob, PageNode } from '../../api/crawl'
-import { recordCrawlUsage } from '../../api/billing'
 import { fetchCrawlPricing, type CrawlPricing } from '../../api/growth'
 import { summarizeJob } from '../../crawl/ai/crawlAiApi'
 import {
@@ -21,11 +20,13 @@ type Props = {
   job: CrawlJob
   root: PageNode | null
   terminal: boolean
+  /** Step 6 guided crawl — surface export formats above the fold. */
+  emphasizeExports?: boolean
 }
 
-export function JobResultsHub({ job, root, terminal }: Props) {
+export function JobResultsHub({ job, root, terminal, emphasizeExports }: Props) {
   const navigate = useNavigate()
-  const { isAuthenticated, tokens } = useAuth()
+  const { isAuthenticated } = useAuth()
   const [pricing, setPricing] = useState<CrawlPricing | null>(null)
   const [aiNote, setAiNote] = useState<string | null>(null)
   const [aiBusy, setAiBusy] = useState(false)
@@ -74,28 +75,10 @@ export function JobResultsHub({ job, root, terminal }: Props) {
     }
   }, [terminal, job, report])
 
-  const freePages = pricing?.free_pages_allowance ?? 5000
-  const pagesWithResults = job.pageCounts.done
   const estimatedCost =
-    pricing && pagesWithResults > 0
-      ? `${pagesWithResults} pages-with-results × ${pricing.display_per_page} (meter: ${freePages.toLocaleString()} free)`
+    pricing && job.pageCounts.done > 0
+      ? `${pricing.display_per_page} × ${job.pageCounts.done} pages`
       : null
-
-  useEffect(() => {
-    if (!terminal || !isAuthenticated || !tokens?.access_token || pagesWithResults <= 0) return
-    let cancelled = false
-    void recordCrawlUsage(tokens.access_token, {
-      crawl_job_id: job.jobId,
-      pages_with_results: pagesWithResults,
-    }).catch(() => {
-      if (!cancelled) {
-        /* billing record is best-effort in test mode */
-      }
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [terminal, isAuthenticated, tokens?.access_token, job.jobId, pagesWithResults])
 
   return (
     <section className="crawl-panel-block crawl-results-hub" aria-labelledby="crawl-results-heading">
@@ -170,7 +153,7 @@ export function JobResultsHub({ job, root, terminal }: Props) {
           report={report}
           navigate={navigate}
           isAuthenticated={isAuthenticated}
-          freePages={freePages}
+          emphasizeExports={emphasizeExports}
         />
       </MotionWrap>
     </section>
@@ -204,61 +187,83 @@ function ReportActions({
   report,
   navigate,
   isAuthenticated,
-  freePages,
+  emphasizeExports,
 }: {
   job: CrawlJob
   report: CrawlJobReport
   navigate: ReturnType<typeof useNavigate>
   isAuthenticated: boolean
-  freePages: number
+  emphasizeExports?: boolean
 }) {
   const hasExport = report.rows.length > 0
 
+  const exportButtons = (
+    <>
+      <button
+        type="button"
+        className="btn btn-primary"
+        disabled={!hasExport}
+        onClick={() => exportJobReport(report, 'csv')}
+      >
+        CSV
+      </button>
+      <button
+        type="button"
+        className="btn btn-ghost"
+        disabled={!hasExport}
+        onClick={() => exportJobReport(report, 'json')}
+      >
+        JSON
+      </button>
+      <button
+        type="button"
+        className="btn btn-ghost"
+        disabled={!hasExport}
+        onClick={() => exportJobReport(report, 'ndjson')}
+      >
+        NDJSON
+      </button>
+      <button
+        type="button"
+        className="btn btn-ghost"
+        disabled={!hasExport}
+        onClick={() => exportJobReport(report, 'md')}
+      >
+        Markdown
+      </button>
+      <button
+        type="button"
+        className="btn btn-ghost"
+        disabled={!hasExport}
+        onClick={() => exportJobReport(report, 'html')}
+      >
+        HTML
+      </button>
+    </>
+  )
+
   return (
     <div className="crawl-report-actions">
-      <div className="crawl-export-row">
-        <span className="hint">Export</span>
-        <button
-          type="button"
-          className="btn btn-ghost"
-          disabled={!hasExport}
-          onClick={() => exportJobReport(report, 'csv')}
-        >
-          CSV
-        </button>
-        <button
-          type="button"
-          className="btn btn-ghost"
-          disabled={!hasExport}
-          onClick={() => exportJobReport(report, 'json')}
-        >
-          JSON
-        </button>
-        <button
-          type="button"
-          className="btn btn-ghost"
-          disabled={!hasExport}
-          onClick={() => exportJobReport(report, 'ndjson')}
-        >
-          NDJSON
-        </button>
-        <button
-          type="button"
-          className="btn btn-ghost"
-          disabled={!hasExport}
-          onClick={() => exportJobReport(report, 'md')}
-        >
-          Markdown
-        </button>
-        <button
-          type="button"
-          className="btn btn-ghost"
-          disabled={!hasExport}
-          onClick={() => exportJobReport(report, 'html')}
-        >
-          HTML
-        </button>
-      </div>
+      {emphasizeExports ? (
+        <div className="crawl-step6-export-card" aria-labelledby="step6-export-heading">
+          <h3 id="step6-export-heading" className="crawl-step6-export-title">
+            Export crawl data
+          </h3>
+          <p className="hint crawl-step6-export-lede">
+            Download the page tree with Domain Link Ratio — client-side from values the .NET worker
+            stored.
+          </p>
+          <div className="crawl-step6-export-buttons">{exportButtons}</div>
+          {!hasExport ? (
+            <p className="hint">No parsed pages to export yet.</p>
+          ) : null}
+        </div>
+      ) : (
+        <div className="crawl-export-row">
+          <span className="hint">Export</span>
+          {exportButtons}
+        </div>
+      )}
 
       <div className="crawl-retry-row">
         <span className="hint">Retry</span>
@@ -291,13 +296,13 @@ function ReportActions({
 
       {!isAuthenticated ? (
         <p className="crawl-save-cta hint">
-          <Link to="/register">Create a free account</Link> for {freePages.toLocaleString()} free pages-with-results,
-          then Stripe test per-page billing. Anonymous crawls still work locally.
+          <Link to="/register">Create a free account</Link> to attach crawls to your team and
+          enable Stripe test billing per page. Anonymous crawls still work locally.
         </p>
       ) : (
         <p className="hint">
-          <Link to="/billing">Billing settings</Link> — {freePages.toLocaleString()} free pages-with-results, then
-          Stripe test meter at the published per-page rate.
+          <Link to="/billing">Billing settings</Link> — Stripe test mode for subscription; per-page
+          meter display uses platform growth config.
         </p>
       )}
     </div>
