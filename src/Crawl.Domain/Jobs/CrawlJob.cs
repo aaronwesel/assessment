@@ -11,7 +11,9 @@ public class CrawlJob
     public const int UrlMaxLength = 2048;
     public const int FailureReasonMaxLength = 500;
     public const int DefaultMaxDepth = 2;
-    public const int DefaultMaxPages = 200;
+    public const int DefaultMaxPages = 5000;
+    /// <summary>Per-job hard cap for maxPages (aligned with free billing page allowance).</summary>
+    public const int AbsoluteMaxPages = 5000;
     public const int AbsoluteMaxDepth = 5;
 
     private CrawlJob() { }
@@ -101,6 +103,7 @@ public class CrawlJob
         ArgumentOutOfRangeException.ThrowIfLessThan(maxDepth, 0);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(maxDepth, AbsoluteMaxDepth);
         ArgumentOutOfRangeException.ThrowIfLessThan(maxPages, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(maxPages, AbsoluteMaxPages);
 
         return new CrawlJob
         {

@@ -122,7 +122,7 @@ Worker flow: persist page row → publish `CrawlPageRequested` only after save; 
 | Internal vs external | Compare link `IdnHost` to `StartHost` (case-insensitive). |
 | Ignored schemes | `mailto:`, `tel:`, relative non-http, etc. — not counted in numerator or denominator. |
 | Depth | Children enqueued only when `parentDepth < maxDepth` (default **2**). |
-| Page budget | `maxPages` (default **200**) — stop inserting new child rows when budget is exhausted. |
+| Page budget | `maxPages` (default **5000**, hard cap **5000**) — stop inserting new child rows when budget is exhausted. |
 | Fan-out order | Internal links only become crawl tasks; stable lexicographic URL order within a depth (BFS-aware with RabbitMQ priority). |
 | URL graph | `UrlNormalizer` canonical form + optional sorted query before unique indexes; see [crawl.md](crawl.md#engine-scrapy-inspired-job-crawler). |
 | robots.txt | Default on — Disallow/Allow longest-prefix, optional `Crawl-delay`; fail-open if robots fetch fails. |
@@ -148,10 +148,10 @@ Operator: inspect DLQ in RabbitMQ management UI; replay is deliberate (not auto)
 
 ## Known limits
 
-- Max depth default **2**; max pages per job ~**200**; HTML-only (no JS render).
+- Max depth default **2**; max pages per job default **5000** (hard cap **5000**); HTML-only (no JS render).
 - No SSRF allowlist yet (known gap vs production).
 - Polling UI (SignalR/SSE cut from 4h path).
-- Per-job write serialization may cap huge single-job throughput (fine at 200 pages).
+- Per-job write serialization may cap huge single-job throughput at large page budgets (up to 5000).
 - Auth optional locally; cloud UI expects platform auth.
 - robots.txt / politeness / redirect-loop guards / query-sort dedup are **on** (see [crawl.md](crawl.md)); still not a Scrapy port.
 
@@ -175,7 +175,7 @@ Maps the home-assignment **implemented first / cut / next** trade-offs from the 
 
 | Cut | Why it was deferrable |
 |-----|------------------------|
-| SignalR / SSE live push | Polling + 200-page cap is acceptable for assessment; push adds broker/UI coupling for little rubric credit. |
+| SignalR / SSE live push | Polling + per-job page budget is acceptable for assessment; push adds broker/UI coupling for little rubric credit. |
 | `terraform apply` / live AWS cutover | **Forbidden** in prep/CI anyway; sketches (`CRAWL_CLOUD.md`, modules) document scale without account risk. |
 | Salesforce live webhook, Rekognition screenshots | Role “much more” — interfaces/outbox stubs OK; live CRM/OCR needs creds and ops time. |
 | Strong SSRF allowlist | Known production gap; robots + politeness + redirect limits shipped first for crawl correctness. |

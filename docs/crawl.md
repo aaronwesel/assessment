@@ -41,7 +41,7 @@ Vite/UI defaults to `VITE_CRAWL_API_URL=http://localhost:5059` for source runs; 
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| `POST` | `/api/jobs` | `{ "url", "maxDepth?"(default 2), "maxPages?"(default 200) }` → `{ jobId }` |
+| `POST` | `/api/jobs` | `{ "url", "maxDepth?"(default 2), "maxPages?"(default 5000, max 5000) }` → `{ jobId }` |
 | `GET` | `/api/jobs/{jobId}` | Status + progress summary (`pageCounts` + `progressPercent`) |
 | `GET` | `/api/jobs/{jobId}/tree` | `{ jobId, status, root }` tree + Domain Link Ratio |
 | `GET` | `/api/jobs/{jobId}/pages/{pageId}/links` | Outgoing links for a page |
