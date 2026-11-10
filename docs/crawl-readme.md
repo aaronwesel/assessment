@@ -25,8 +25,8 @@ docker compose --profile otel up --build
 
 | Surface | URL / check |
 |---------|-------------|
-| Crawl API | `http://localhost:8080` · `GET /health/live` · `GET /health/ready` · Swagger `/swagger` |
-| Crawl Worker | `http://localhost:8081/health/live` · `/health/ready` (Postgres + RabbitMQ) · MassTransit consumer on `crawl.page` |
+| Crawl API | `http://localhost:8080` · `GET /health` · Swagger `/swagger` |
+| Crawl Worker | `http://localhost:8081/health` + competing consumer on `crawl.page` |
 | React UI | `http://localhost:3000` · `/crawl`, `/crawl/jobs/:id`, `/crawl/history` · `VITE_CRAWL_API_URL` |
 | RabbitMQ UI | `http://localhost:15672` (default guest/guest) |
 | Postgres | `app` DB = platform · `crawl` DB = crawler (`docker/postgres-init`) |
@@ -50,20 +50,20 @@ dotnet test Crawl.sln
 Browser (React)
     │  REST poll
     ▼
-Crawl.Api  ──MassTransit send──►  RabbitMQ (crawl.page → crawl.page.dlx → crawl.page.dlq)
-    │                                   │
-    │                                   ▼
-    │                             Crawl.Worker(s)  ──HTTP GET HTML──► sites
-    │                                   │
-    └──────── EF Core ──────────────────┴──► PostgreSQL (jobs / pages / edges)
+Crawl.Api  ──publish──►  RabbitMQ (crawl.page → crawl.page.dlq)
+    │                         │
+    │                         ▼
+    │                   Crawl.Worker(s)  ──HTTP GET HTML──► sites
+    │                         │
+    └──────── EF Core ────────┴──► PostgreSQL (jobs / pages / edges)
 ```
 
 | Piece | Responsibility |
 |-------|----------------|
 | `Crawl.Domain` | UrlNormalizer, Domain Link Ratio, job/page/edge rules — **no I/O** |
-| `Crawl.Infrastructure` | EF Core, MassTransit+RabbitMQ, Polly HTTP resilience, upserts, health |
-| `Crawl.Api` | Create job, status, tree, history, cancel, `/health/live`+`/ready`, OpenAPI |
-| `Crawl.Worker` | MassTransit at-least-once consume → fetch HTML → parse links (.NET only) → `ON CONFLICT` upsert → enqueue children |
+| `Crawl.Infrastructure` | EF Core, RabbitMQ declare/publish/consume, HttpClient resilience |
+| `Crawl.Api` | Create job, status, tree, history, cancel, health, OpenAPI |
+| `Crawl.Worker` | At-least-once consume → fetch HTML → parse links (.NET only) → upsert → enqueue children |
 | React | Start crawl, live progress, tree + DLR, history |
 | Platform FastAPI | Auth / billing / ops — optional locally; required for cloud UI auth story |
 
@@ -99,26 +99,12 @@ One message **per page** (`CrawlPageRequested`). Queue `crawl.page`; DLQ `crawl.
 
 At-least-once delivery → handlers must be safe under redelivery and multi-worker races:
 
-1. Unique `(JobId, Url)` on `crawl_pages`; unique `(SourcePageId, TargetUrl)` on edges.
-2. Child fan-out uses PostgreSQL `INSERT … ON CONFLICT (JobId, Url) DO NOTHING RETURNING` (`PageUpsertStore`).
-3. Edges: delete-by-source + `INSERT … ON CONFLICT DO NOTHING`.
-4. Terminal page statuses are no-ops on redelivery.
-5. Cancel: workers check job status before fetch/enqueue; do not schedule children after cancel.
+1. Unique `(job_id, url)` on `crawl_pages`; unique `(source_page_id, target_url)` on edges.
+2. Terminal page statuses are no-ops on redelivery.
+3. Child inserts tolerate unique races between workers.
+4. Cancel: workers check job status before fetch/enqueue; do not schedule children after cancel.
 
-Worker flow: persist page row → MassTransit send `CrawlPageRequested` only after save; on consume, skip terminal pages, then fetch → edges → optional child upserts → publish children **after** DB commit (`CrawlPageProcessor`).
-
----
-
-## Architecture trade-offs (event-driven crawl)
-
-| Decision | Choice | Why |
-|----------|--------|-----|
-| Pull / event-driven | **Event-driven** page messages on RabbitMQ via **MassTransit** | Independent API vs Worker scale-out under heavy jobs; PDF rubric requires async boundary + at-least-once + DLQ. Competing consumers = horizontal worker scale without changing the API. |
-| Messaging library | **MassTransit 8 + RabbitMQ** (not raw `BasicPublish` loops) | `UseMessageRetry(r => r.Exponential(...))` for transient network/HTTP faults; dedicated `crawl.page.dlx` → `crawl.page.dlq`; still keep API and Worker as **separate processes**. |
-| Idempotency | **DB unique indexes + `ON CONFLICT DO NOTHING`** | Broker redelivery and multi-worker races are expected; correctness lives in Postgres, not in “exactly-once” messaging myths. |
-| Outbound HTTP | Polly exponential retry + **per-host politeness gate** | Simulates respectful payer-portal connectivity (rate-limit / IP-block avoidance) without owning eligibility X12. |
-| Correlation | `X-Correlation-Id` middleware → Serilog → MassTransit headers | RCM-style audit trail across API publish and worker consume. |
-| Live UI push | Polling (SignalR cut) | Graded PDF flow works with Job Details poll; SignalR remains a stretch, not a substitute for jobs/tree/DLR. |
+Worker flow: persist page row → publish `CrawlPageRequested` only after save; on consume, skip terminal pages, then fetch → edges → optional child rows → publish children **after** DB commit (`CrawlPageProcessor`).
 
 ---
 
@@ -136,7 +122,7 @@ Worker flow: persist page row → MassTransit send `CrawlPageRequested` only aft
 | Internal vs external | Compare link `IdnHost` to `StartHost` (case-insensitive). |
 | Ignored schemes | `mailto:`, `tel:`, relative non-http, etc. — not counted in numerator or denominator. |
 | Depth | Children enqueued only when `parentDepth < maxDepth` (default **2**). |
-| Page budget | `maxPages` (default **200**) — stop inserting new child rows when budget is exhausted. |
+| Page budget | `maxPages` (default **5000**, hard cap **5000**) — stop inserting new child rows when budget is exhausted. |
 | Fan-out order | Internal links only become crawl tasks; stable lexicographic URL order within a depth (BFS-aware with RabbitMQ priority). |
 | URL graph | `UrlNormalizer` canonical form + optional sorted query before unique indexes; see [crawl.md](crawl.md#engine-scrapy-inspired-job-crawler). |
 | robots.txt | Default on — Disallow/Allow longest-prefix, optional `Crawl-delay`; fail-open if robots fetch fails. |
@@ -152,28 +138,20 @@ Tree API exposes per-node DLR for Done pages; React shows `DLR` on the job tree.
 
 | Stage | Behavior |
 |-------|----------|
-| Transient HTTP / broker | MassTransit `UseMessageRetry` **exponential** backoff (min 200ms → max 30s) |
-| Exhausted attempts / poison | Faulted messages → dedicated DLX `crawl.page.dlx` → queue `crawl.page.dlq` |
+| Transient HTTP / broker | Retry with backoff; `x-retry-count` header |
+| Exhausted attempts / poison | Nack without requeue → `crawl.page.dlq` |
 | Job cancel | Finish in-flight page without further fan-out |
 
 Operator: inspect DLQ in RabbitMQ management UI; replay is deliberate (not auto).
-
-## Health
-
-| Endpoint | Meaning |
-|----------|---------|
-| `GET /health/live` | Process up (liveness) |
-| `GET /health/ready` | Postgres + RabbitMQ connectivity (readiness; worker must pass both) |
-| `GET /health` | Same as ready (Compose / legacy probes) |
 
 ---
 
 ## Known limits
 
-- Max depth default **2**; max pages per job ~**200**; HTML-only (no JS render).
+- Max depth default **2**; max pages per job default **5000** (hard cap **5000**); HTML-only (no JS render).
 - No SSRF allowlist yet (known gap vs production).
-- Live Job Details: SignalR hub `/hubs/crawl-jobs` with REST polling fallback.
-- Per-job write serialization may cap huge single-job throughput (fine at 200 pages).
+- Polling UI (SignalR/SSE cut from 4h path).
+- Per-job write serialization may cap huge single-job throughput at large page budgets (up to 5000).
 - Auth optional locally; cloud UI expects platform auth.
 - robots.txt / politeness / redirect-loop guards / query-sort dedup are **on** (see [crawl.md](crawl.md)); still not a Scrapy port.
 
@@ -190,14 +168,14 @@ Maps the home-assignment **implemented first / cut / next** trade-offs from the 
 | Domain tests — `UrlNormalizer` + **Domain Link Ratio** | Wrong graph math invalidates the whole demo; cheap to test; blocks API/UI lies about ratios. |
 | API + Postgres — jobs/pages/edges, create/status/tree/history/cancel/health | Contract the UI and worker share; persistence proves idempotent schema before broker load. |
 | Worker + RabbitMQ — consume, fetch, parse, upsert, retries/DLQ | Rubric’s async boundary; without at-least-once + DLQ the job model is incomplete. |
-| React Start / Details / History (+ SignalR live progress, REST fallback) | End-to-end proof for reviewers; PDF flow survives if the hub drops. |
+| React poll UI — Start / Details / History | End-to-end proof for reviewers; polling is enough for a timed crawl. |
 | Docker Compose + this README + CI | One-command repro + gates on `dotnet test` / docker builds — submission hygiene. |
 
 ### Cut if needed — and why
 
 | Cut | Why it was deferrable |
 |-----|------------------------|
-| Per-job ephemeral EC2 / JS render | Competing workers + SignalR cover the live demo; ephemeral host handoff stays stretch-next. |
+| SignalR / SSE live push | Polling + per-job page budget is acceptable for assessment; push adds broker/UI coupling for little rubric credit. |
 | `terraform apply` / live AWS cutover | **Forbidden** in prep/CI anyway; sketches (`CRAWL_CLOUD.md`, modules) document scale without account risk. |
 | Salesforce live webhook, Rekognition screenshots | Role “much more” — interfaces/outbox stubs OK; live CRM/OCR needs creds and ops time. |
 | Strong SSRF allowlist | Known production gap; robots + politeness + redirect limits shipped first for crawl correctness. |
@@ -254,6 +232,22 @@ Release/rollback (cloud day): bake immutable image tags → ECS new task definit
 | UI | Job Details → Assistive AI → **Incidents / remediations** (last AI action status) |
 
 Config: `CrawlAi:IncidentMonitorEnabled`, `CrawlEgress:Proxies`, `Crawl:Alerts:*`. API: `GET /api/ai/jobs/{jobId}/incidents`.
+
+---
+
+## Product UX (Trailmap)
+
+React routes (unchanged contract, redesigned surfaces):
+
+| Path | Experience |
+|------|------------|
+| `/` | **Landing** — Trailmap wordmark, 3-step “how it works”, per-page Stripe test pricing + example cost, single **Start guided crawl** CTA |
+| `/crawl/welcome` | **Guided flow** — steps 1–4 (URL → probe → scope → confirm); persistent **Crawl guide** (`POST /api/ai/setup/preview`); **Advanced options** drawer |
+| `/crawl` | Expert quick start (still Start → Job Details → History) |
+| `/crawl/jobs/:id` | Steps 5–6: live progress + readable DLR summary, exports (CSV/JSON/NDJSON/Markdown/HTML), tree, element pick |
+| `/crawl/history` | Paginated history with empty/error states |
+
+**Rules:** Assistive AI (DeepSeek when `DEEPSEEK_API_KEY` is set) coaches operators only — Domain Link Ratio, URL normalization, and link graph edges remain in `Crawl.Domain` / Worker.
 
 ---
 

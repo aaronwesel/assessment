@@ -17,6 +17,7 @@ import {
   saveAdvancedToStorage,
   type CrawlAdvancedOptions,
 } from '../../components/crawl/crawlAdvancedOptions'
+import { ABSOLUTE_MAX_PAGES, DEFAULT_MAX_PAGES } from '../../components/crawl/crawlLimits'
 
 function coerceUrl(input: string): string {
   const trimmed = input.trim()
@@ -227,10 +228,13 @@ export function WelcomeWizardPage() {
                     <input
                       type="number"
                       min={1}
-                      max={200}
+                      max={ABSOLUTE_MAX_PAGES}
                       value={advanced.maxPages}
                       onChange={(e) =>
-                        setAdvanced((a) => ({ ...a, maxPages: Number(e.target.value) || 200 }))
+                        setAdvanced((a) => ({
+                          ...a,
+                          maxPages: Number(e.target.value) || DEFAULT_MAX_PAGES,
+                        }))
                       }
                     />
                   </label>
