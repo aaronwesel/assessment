@@ -1,14 +1,21 @@
 using System.Collections.Concurrent;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Npgsql;
 
 namespace Crawl.Infrastructure.Http;
 
 /// <summary>
 /// Per-host spacing between fetches (Scrapy DOWNLOAD_DELAY / Crawl-delay inspired).
-/// Supports incident remediations: politeness bump multipliers and scheduled backoff.
+/// Process-local gate plus optional Postgres advisory lock so concurrent workers
+/// on the same host do not stampede when scaled out on a shared queue.
 /// </summary>
-public sealed class HostPolitenessGate(IOptions<CrawlHttpOptions> options)
+public sealed class HostPolitenessGate(
+    IOptions<CrawlHttpOptions> options,
+    ILogger<HostPolitenessGate> logger,
+    NpgsqlDataSource? dataSource = null)
 {
+    // dataSource optional so unit tests can exercise process-local politeness without Postgres.
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _hostLocks = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, long> _nextAllowedTicks = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, double> _politenessMultipliers = new(StringComparer.OrdinalIgnoreCase);
@@ -48,6 +55,9 @@ public sealed class HostPolitenessGate(IOptions<CrawlHttpOptions> options)
         await gate.WaitAsync(cancellationToken);
         try
         {
+            // Cross-worker serialization for the same host (best-effort; falls back to local-only).
+            await using var distributed = await TryAcquireDistributedLockAsync(key, cancellationToken);
+
             var baseDelay = robotsCrawlDelay
                 ?? TimeSpan.FromMilliseconds(Math.Max(0, options.Value.PolitenessDelayMilliseconds));
 
@@ -67,6 +77,79 @@ public sealed class HostPolitenessGate(IOptions<CrawlHttpOptions> options)
         finally
         {
             gate.Release();
+        }
+    }
+
+    private async Task<IAsyncDisposable?> TryAcquireDistributedLockAsync(
+        string hostKey,
+        CancellationToken cancellationToken)
+    {
+        if (!options.Value.DistributedHostPoliteness || dataSource is null)
+            return null;
+
+        try
+        {
+            var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+            // Stable 64-bit key from host string; two-key advisory lock namespace "crawl-host".
+            var lockKey = StableHash(hostKey);
+            await using (var cmd = connection.CreateCommand())
+            {
+                cmd.CommandText = "SELECT pg_advisory_lock(872014, @k)";
+                cmd.Parameters.AddWithValue("k", lockKey);
+                await cmd.ExecuteNonQueryAsync(cancellationToken);
+            }
+
+            return new AdvisoryLockRelease(connection, lockKey, logger);
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "Distributed host politeness lock unavailable for {Host}; using process-local only", hostKey);
+            return null;
+        }
+    }
+
+    /// <summary>Deterministic non-cryptographic hash suitable for advisory lock keys.</summary>
+    public static int StableHash(string value)
+    {
+        unchecked
+        {
+            uint hash = 2166136261;
+            foreach (var ch in value)
+            {
+                hash ^= ch;
+                hash *= 16777619;
+            }
+
+            // Avoid 0 which can collide with unused keys; keep in int range.
+            var asInt = (int)(hash & 0x7FFFFFFF);
+            return asInt == 0 ? 1 : asInt;
+        }
+    }
+
+    private sealed class AdvisoryLockRelease(
+        NpgsqlConnection connection,
+        int lockKey,
+        ILogger logger) : IAsyncDisposable
+    {
+        public async ValueTask DisposeAsync()
+        {
+            try
+            {
+                await using (var cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText = "SELECT pg_advisory_unlock(872014, @k)";
+                    cmd.Parameters.AddWithValue("k", lockKey);
+                    await cmd.ExecuteNonQueryAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogDebug(ex, "Failed to release host advisory lock {Key}", lockKey);
+            }
+            finally
+            {
+                await connection.DisposeAsync();
+            }
         }
     }
 }

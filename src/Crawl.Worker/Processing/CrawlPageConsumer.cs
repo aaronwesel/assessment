@@ -75,7 +75,8 @@ public sealed class CrawlPageConsumer(
 
             using var scope = scopeFactory.CreateScope();
             var processor = scope.ServiceProvider.GetRequiredService<CrawlPageProcessor>();
-            await processor.ProcessAsync(message, CancellationToken.None);
+            // Redelivered=true after crash/unacked so Processing pages can be reclaimed safely.
+            await processor.ProcessAsync(message, args.Redelivered, CancellationToken.None);
 
             channel.BasicAck(args.DeliveryTag, multiple: false);
         }
