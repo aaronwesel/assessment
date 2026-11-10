@@ -25,8 +25,17 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         environment=settings.environment,
         deepseek_enabled=settings.deepseek_enabled,
         rekognition_enabled=settings.rekognition_enabled,
+        google_configured=settings.google_configured,
+        microsoft_configured=settings.microsoft_configured,
+        ses_enabled=settings.ses_enabled,
     )
     get_redis()
+    # Local/test: ensure schema without requiring a prior alembic upgrade.
+    # Production should run migrations as a deploy step (not on API boot).
+    if settings.environment in {"local", "test"}:
+        from app.db.session import init_db
+
+        init_db()
     yield
     log_event(logger, "app_shutdown")
 

@@ -1,4 +1,4 @@
-"""Auth stubs: password placeholders + Google/Microsoft One Tap token exchange."""
+"""Auth: password register/login, Google/Microsoft One Tap exchange, JWT refresh."""
 
 from __future__ import annotations
 
@@ -7,15 +7,21 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
 
+from app.alerts.login_alert import maybe_send_login_alert
+from app.api.deps import RedisDep, SessionDep
+from app.core.config import get_settings
 from app.core.logging import get_logger, log_event
 from app.core.rbac import AuthContext, Role, get_current_auth, require_role
 from app.core.security import (
     create_access_token,
     create_refresh_token,
     decode_token,
-    hash_password,
-    verify_password,
+    revoke_token,
 )
+from app.models.account_link import IdentityProvider
+from app.services import users as user_service
+from app.services.google_id_token import verify_google_id_token
+from app.services.microsoft_id_token import verify_microsoft_id_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 logger = get_logger(__name__)
@@ -42,6 +48,11 @@ class RefreshRequest(BaseModel):
     refresh_token: str
 
 
+class LogoutRequest(BaseModel):
+    access_token: str | None = None
+    refresh_token: str | None = None
+
+
 class OneTapExchangeRequest(BaseModel):
     """ID token from Google Identity Services or Microsoft MSAL One Tap."""
 
@@ -52,11 +63,17 @@ class OneTapExchangeRequest(BaseModel):
 class ProtectedPingResponse(BaseModel):
     subject: str
     roles: list[str]
+    email: str | None = None
+    full_name: str | None = None
     message: str = "ok"
 
 
-# In-memory stub store for password flows until DB wiring is complete.
-_STUB_USERS: dict[str, dict[str, str]] = {}
+class AuthProvidersResponse(BaseModel):
+    google: bool
+    microsoft: bool
+    password: bool = True
+    ses_enabled: bool
+    login_alert_email_enabled: bool
 
 
 def _issue_tokens(subject: str, roles: list[str]) -> TokenPair:
@@ -66,44 +83,55 @@ def _issue_tokens(subject: str, roles: list[str]) -> TokenPair:
     )
 
 
-def _stub_verify_id_token(id_token: str, *, provider: str) -> str:
-    """
-    Placeholder token verification.
-    Real GIS / MSAL JWKS validation lands when OAuth client IDs are configured.
-    Does not log the id_token (contains PII).
-    """
-    if len(id_token) < 10:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid id_token")
-    return f"{provider}:stub:{id_token[:8]}"
+@router.get("/providers", response_model=AuthProvidersResponse)
+def auth_providers() -> AuthProvidersResponse:
+    settings = get_settings()
+    return AuthProvidersResponse(
+        google=settings.google_configured,
+        microsoft=settings.microsoft_configured,
+        password=True,
+        ses_enabled=settings.ses_enabled and bool(settings.ses_from_email),
+        login_alert_email_enabled=settings.login_alert_email_enabled,
+    )
 
 
 @router.post("/register", response_model=TokenPair, status_code=status.HTTP_201_CREATED)
-def register_password(body: PasswordRegisterRequest) -> TokenPair:
+def register_password(body: PasswordRegisterRequest, session: SessionDep) -> TokenPair:
     # HIPAA: do not log email/password.
-    log_event(logger, "password_register_stub")
-    if body.email in _STUB_USERS:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already exists")
-    _STUB_USERS[body.email] = {
-        "hashed_password": hash_password(body.password),
-        "role": Role.USER.value,
-    }
-    return _issue_tokens(subject=body.email, roles=[Role.USER.value])
+    log_event(logger, "password_register")
+    try:
+        user = user_service.create_password_user(
+            session,
+            email=body.email,
+            password=body.password,
+            full_name=body.full_name,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    return _issue_tokens(subject=user.id, roles=user_service.role_values(user))
 
 
 @router.post("/login", response_model=TokenPair)
-def login_password(body: PasswordLoginRequest) -> TokenPair:
-    log_event(logger, "password_login_stub")
-    user = _STUB_USERS.get(body.email)
-    if user is None or not verify_password(body.password, user["hashed_password"]):
+def login_password(body: PasswordLoginRequest, session: SessionDep) -> TokenPair:
+    log_event(logger, "password_login")
+    user = user_service.authenticate_password(
+        session,
+        email=body.email,
+        password=body.password,
+    )
+    if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
         )
-    return _issue_tokens(subject=body.email, roles=[user["role"]])
+    # Optional SES login alert (LOGIN_ALERT_EMAIL_ENABLED=false by default).
+    # Does not embed email/subject in the message body (HIPAA: no PHI in alerts).
+    maybe_send_login_alert(event_code="password_login_success")
+    return _issue_tokens(subject=user.id, roles=user_service.role_values(user))
 
 
 @router.post("/refresh", response_model=TokenPair)
-def refresh_tokens(body: RefreshRequest) -> TokenPair:
+def refresh_tokens(body: RefreshRequest, session: SessionDep) -> TokenPair:
     try:
         payload = decode_token(body.refresh_token, expected_type="refresh")
     except ValueError as exc:
@@ -114,37 +142,100 @@ def refresh_tokens(body: RefreshRequest) -> TokenPair:
     subject = str(payload.get("sub", ""))
     if not subject:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-    return _issue_tokens(subject=subject, roles=[Role.USER.value])
+
+    user = user_service.get_user_by_id(session, subject)
+    if user is None or not user.is_active:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User unavailable")
+
+    # Rotate: revoke old refresh, issue new pair.
+    revoke_token(body.refresh_token)
+    return _issue_tokens(subject=user.id, roles=user_service.role_values(user))
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout(body: LogoutRequest, _redis: RedisDep) -> None:
+    log_event(logger, "logout")
+    if body.access_token:
+        revoke_token(body.access_token)
+    if body.refresh_token:
+        revoke_token(body.refresh_token)
 
 
 @router.post("/google/onetap", response_model=TokenPair)
-def google_onetap_exchange(body: OneTapExchangeRequest) -> TokenPair:
-    """Stub: exchange Google One Tap ID token for our JWT pair."""
+def google_onetap_exchange(body: OneTapExchangeRequest, session: SessionDep) -> TokenPair:
+    """Exchange a Google One Tap ID token for our JWT pair."""
     if body.provider != "google":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="provider must be google")
-    log_event(logger, "google_onetap_exchange_stub")
-    subject = _stub_verify_id_token(body.id_token, provider="google")
-    return _issue_tokens(subject=subject, roles=[Role.USER.value])
+    settings = get_settings()
+    if not settings.google_configured:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Google sign-in is not configured",
+        )
+    log_event(logger, "google_onetap_exchange")
+    try:
+        identity = verify_google_id_token(body.id_token)
+        user = user_service.upsert_federated_user(
+            session,
+            provider=IdentityProvider.GOOGLE,
+            provider_subject=identity.subject,
+            email=identity.email,
+            full_name=identity.full_name,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Google credentials",
+        ) from exc
+    maybe_send_login_alert(event_code="google_onetap_login_success")
+    return _issue_tokens(subject=user.id, roles=user_service.role_values(user))
 
 
 @router.post("/microsoft/onetap", response_model=TokenPair)
-def microsoft_onetap_exchange(body: OneTapExchangeRequest) -> TokenPair:
-    """Stub: exchange Microsoft One Tap ID token for our JWT pair."""
+def microsoft_onetap_exchange(body: OneTapExchangeRequest, session: SessionDep) -> TokenPair:
+    """Exchange a Microsoft MSAL / One Tap ID token for our JWT pair."""
     if body.provider != "microsoft":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="provider must be microsoft",
         )
-    log_event(logger, "microsoft_onetap_exchange_stub")
-    subject = _stub_verify_id_token(body.id_token, provider="microsoft")
-    return _issue_tokens(subject=subject, roles=[Role.USER.value])
+    settings = get_settings()
+    if not settings.microsoft_configured:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Microsoft sign-in is not configured",
+        )
+    log_event(logger, "microsoft_onetap_exchange")
+    try:
+        identity = verify_microsoft_id_token(body.id_token)
+        user = user_service.upsert_federated_user(
+            session,
+            provider=IdentityProvider.MICROSOFT,
+            provider_subject=identity.subject,
+            email=identity.email,
+            full_name=identity.full_name,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Microsoft credentials",
+        ) from exc
+    maybe_send_login_alert(event_code="microsoft_onetap_login_success")
+    return _issue_tokens(subject=user.id, roles=user_service.role_values(user))
 
 
 @router.get("/me", response_model=ProtectedPingResponse)
 def auth_me(
     auth: Annotated[AuthContext, Depends(get_current_auth)],
+    session: SessionDep,
 ) -> ProtectedPingResponse:
-    return ProtectedPingResponse(subject=auth.subject, roles=sorted(auth.roles))
+    user = user_service.get_user_by_id(session, auth.subject)
+    return ProtectedPingResponse(
+        subject=auth.subject,
+        roles=sorted(auth.roles),
+        email=user.email if user else None,
+        full_name=user.full_name if user else None,
+    )
 
 
 @router.get(

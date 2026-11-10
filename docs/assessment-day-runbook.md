@@ -42,7 +42,8 @@ Operational playbook for the timed take-home / live assessment. Prep scaffolding
 |------|-----------------|
 | Compose | `docker compose ps` — db/redis healthy; api/frontend respond |
 | API health | `GET /health` → 200 |
-| CI | lint · test · docker · terraform fmt/validate green on the PR |
+| Auth | See [auth-smoke.md](./auth-smoke.md) — password + One Tap exchange; `pytest -q` in `backend/` |
+| CI | lint · pytest · docker · terraform fmt/validate green on the PR |
 | Terraform | `terraform fmt` + `validate` only until explicit apply decision |
 | HIPAA | Checklist rows for MVP path marked done or explicitly deferred with owner |
 

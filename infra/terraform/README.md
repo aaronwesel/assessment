@@ -43,7 +43,8 @@ Optional plan dry-run (still no apply; requires AWS creds and filled tfvars — 
 | Secrets Manager | `modules/secrets` | App/DB/Redis secret shells (no values committed) |
 | CloudWatch | `modules/cloudwatch` | Log groups + retention |
 | WAF | `modules/waf` | Placeholder association to ALB |
-| IAM | `modules/iam` | Execution + task roles; Rekognition on task role |
+| IAM | `modules/iam` | Execution + task roles; Rekognition + SES send on task role |
+| SES | `modules/ses` | Domain/email identity + config set placeholders; CloudWatch metrics notes |
 
 ## Environments
 
@@ -57,6 +58,10 @@ cp environments/prod.tfvars.example environments/prod.tfvars
 ## Rekognition
 
 The ECS **task role** includes an IAM permission sketch for Amazon Rekognition APIs (labels / moderation / detect text as needed). Prefer task-role credentials over long-lived access keys in the app.
+
+## SES (alerts)
+
+`modules/ses` holds domain/email identity and configuration-set placeholders for login/system alerts. The ECS **task role** may `ses:SendEmail` / `ses:SendRawEmail` (scoped to identity ARNs when set). See `modules/ses/README.md` for CloudWatch bounce/complaint metric notes. Keep `SES_ENABLED=false` in the app until identities are verified. **Still do not apply.**
 
 ## DeepSeek / egress
 

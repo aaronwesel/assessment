@@ -33,11 +33,13 @@ Production-oriented, HIPAA-ready SaaS scaffold (FastAPI · React · Terraform �
    | Service | Default URL / check |
    |---------|---------------------|
    | API | `GET http://localhost:8000/health` → `200` |
-   | Frontend | `http://localhost:3000` (stub until `frontend/Dockerfile`) |
+   | Frontend | `http://localhost:3000` (stub until `frontend/Dockerfile`); use `cd frontend && npm run dev` for real auth UI |
    | Postgres | `postgres://app:changeme-local-only@localhost:5432/app` (Compose only) |
    | Redis | `redis://localhost:6379/0` |
 
 Compose builds the real FastAPI image from `backend/`. Frontend remains an http-echo stub until `frontend/Dockerfile` lands.
+
+Auth smoke (password + Google/Microsoft One Tap): see [docs/auth-smoke.md](docs/auth-smoke.md).
 
 ## Environment
 

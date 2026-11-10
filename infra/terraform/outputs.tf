@@ -65,6 +65,16 @@ output "waf_web_acl_arn" {
   value       = module.waf.web_acl_arn
 }
 
+output "ses_configuration_set_name" {
+  description = "SES alerts configuration set name (placeholder)"
+  value       = module.ses.configuration_set_name
+}
+
+output "ses_from_email" {
+  description = "SES FROM email placeholder"
+  value       = module.ses.from_email
+}
+
 output "apply_gate" {
   description = "Reminder: apply is forbidden until assessment day"
   value       = "FORBIDDEN_UNTIL_ASSESSMENT_DAY"

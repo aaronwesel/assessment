@@ -2,21 +2,34 @@
 
 from collections.abc import Generator
 
-from sqlmodel import Session, create_engine
+from sqlalchemy.pool import StaticPool
+from sqlmodel import Session, SQLModel, create_engine
 
 from app.core.config import get_settings
 
 _settings = get_settings()
 
-# SQLite fallback for unit tests without Postgres.
-_connect_args = {"check_same_thread": False} if _settings.database_url.startswith("sqlite") else {}
+_is_sqlite = _settings.database_url.startswith("sqlite")
+_connect_args = {"check_same_thread": False} if _is_sqlite else {}
+_engine_kwargs: dict = {
+    "echo": False,
+    "connect_args": _connect_args,
+    "pool_pre_ping": not _is_sqlite,
+}
+# Shared in-memory DB across connections for pytest.
+if _is_sqlite and ":memory:" in _settings.database_url:
+    _engine_kwargs["poolclass"] = StaticPool
 
-engine = create_engine(
-    _settings.database_url,
-    echo=False,
-    connect_args=_connect_args,
-    pool_pre_ping=True,
-)
+engine = create_engine(_settings.database_url, **_engine_kwargs)
+
+
+def init_db() -> None:
+    """Create tables for local/test when migrations have not run yet."""
+    # Import models so metadata is populated.
+    from app.models import account_link as _account_link  # noqa: F401
+    from app.models import user as _user  # noqa: F401
+
+    SQLModel.metadata.create_all(engine)
 
 
 def get_session() -> Generator[Session, None, None]:

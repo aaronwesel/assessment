@@ -15,8 +15,12 @@ enum ApiConfig {
         return raw.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
     }
 
-    // Placeholder paths — align with backend OpenAPI when auth stubs land.
-    static let loginPasswordPath = "/auth/login"
-    static let loginGooglePath = "/auth/google"
-    static let loginMicrosoftPath = "/auth/microsoft"
+    // Auth API paths (same contract as web / Android).
+    static let loginPasswordPath = "/api/v1/auth/login"
+    static let registerPasswordPath = "/api/v1/auth/register"
+    static let loginGooglePath = "/api/v1/auth/google/onetap"
+    static let loginMicrosoftPath = "/api/v1/auth/microsoft/onetap"
+    static let authMePath = "/api/v1/auth/me"
+    static let authRefreshPath = "/api/v1/auth/refresh"
+    static let authLogoutPath = "/api/v1/auth/logout"
 }

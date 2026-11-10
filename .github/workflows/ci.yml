@@ -37,15 +37,26 @@ jobs:
   test:
     name: test
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
     steps:
       - uses: actions/checkout@v4
-      - name: Unit / integration stub
-        run: |
-          if [ -d backend/tests ] || [ -f backend/pyproject.toml ]; then
-            echo "Backend tests path present — wire pytest in a follow-up."
-          else
-            echo "No backend tests yet; test stub OK."
-          fi
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend deps
+        run: pip install -r requirements.txt
+      - name: Pytest (auth + health + SES stubs)
+        run: pytest -q
+        env:
+          ENVIRONMENT: test
+          SECRET_KEY: ci-test-secret-not-for-production
+          DATABASE_URL: sqlite:///:memory:
+          SES_ENABLED: "false"
+          LOGIN_ALERT_EMAIL_ENABLED: "false"
 
   docker:
     name: docker
