@@ -125,7 +125,7 @@ public sealed class CrawlPageProcessor(
 
         foreach (var link in links)
         {
-            var isInternal = string.Equals(link.IdnHost, startHost, StringComparison.OrdinalIgnoreCase);
+            var isInternal = CrawlSiteHost.IsSameSite(link, startHost);
             if (isInternal)
             {
                 internalCount++;

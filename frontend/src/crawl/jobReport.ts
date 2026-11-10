@@ -77,9 +77,21 @@ export function buildJobReport(job: CrawlJob, root: PageNode | null): CrawlJobRe
   const hints: string[] = []
 
   let outcome: CrawlJobReport['outcome'] = 'success'
+  const rootRow = rows.find((r) => r.depth === 0)
+  const shallowTree =
+    job.status === 'Completed' &&
+    job.maxDepth >= 1 &&
+    job.pageCounts.total < Math.min(15, Math.max(5, Math.floor(job.maxPages * 0.08)))
+  const manyLinksFewInternal =
+    rootRow?.linkCount != null &&
+    rootRow.linkCount >= 20 &&
+    (rootRow.internalLinkCount ?? 0) < Math.max(3, Math.floor(rootRow.linkCount * 0.15))
+
   if (job.status === 'Failed') outcome = 'failed'
   else if (pagesDone === 0) outcome = 'empty'
   else if (pagesFailed > 0 || job.pageCounts.skipped > 0) outcome = 'partial'
+  else if (shallowTree && manyLinksFewInternal) outcome = 'partial'
+  else if (shallowTree && pagesDone <= 3) outcome = 'partial'
 
   if (pagesDone === 0) {
     hints.push('No HTML pages finished parsing — check the start URL, depth, or login wall.')
@@ -91,6 +103,14 @@ export function buildJobReport(job: CrawlJob, root: PageNode | null): CrawlJobRe
   }
   if (withDlr.length > 0 && avgDlr !== null && avgDlr < 0.15) {
     hints.push('Low average Domain Link Ratio — mostly external links; confirm the seed host matches target content.')
+  }
+  if (rootRow?.linkCount != null && rootRow.linkCount >= 15 && (rootRow.internalLinkCount ?? 0) <= 3) {
+    hints.push(
+      'Homepage parsed many links but almost none were same-site — try seeding with www if the site redirects (e.g. https://www.ebay.com/), or re-run after a host-matching update.',
+    )
+  }
+  if (job.diagnostics?.length) {
+  for (const line of job.diagnostics) hints.push(line)
   }
 
   return {
@@ -118,8 +138,14 @@ export function diagnoseEmptyOrWeak(job: CrawlJob, report: CrawlJobReport): stri
     if (!job.url.startsWith('http')) {
       tips.push('Start URL should include https:// — the wizard can fix common typos.')
     }
-    if (parsed.pathname === '/' && job.maxDepth >= 1 && report.pagesDone <= 1) {
-      tips.push('Homepage may not link to the section you need — paste a deeper folder URL (e.g. /pages/).')
+    if (parsed.pathname === '/' && job.maxDepth >= 1 && report.pagesDone <= 3) {
+      tips.push('Homepage may not link to the section you need — paste a deeper folder URL (e.g. /deals/) or raise depth.')
+    }
+    const host = parsed.hostname.replace(/^www\./i, '')
+    if (!parsed.hostname.startsWith('www.') && report.pagesDone <= 5 && job.maxDepth >= 1) {
+      tips.push(
+        `Seed uses bare host ${host} — many sites redirect to www.${host}; prefer the canonical URL if the tree looks too small.`,
+      )
     }
   } catch {
     tips.push('URL could not be parsed — use a full https:// address.')
