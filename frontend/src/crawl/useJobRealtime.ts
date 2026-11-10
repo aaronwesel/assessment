@@ -1,9 +1,17 @@
 /**
  * Live job progress: prefer SignalR hub, fall back to REST polling.
  * Hub unavailable / negotiate fail → poll mode (PDF flow still works).
+ *
+ * StrictMode note: delay start slightly so the first mount's cleanup cancels
+ * before negotiate begins (avoids aborted "Failed to fetch" dead-ends).
  */
-import { HubConnection, HubConnectionBuilder, HubConnectionState, LogLevel } from '@microsoft/signalr'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  HubConnection,
+  HubConnectionBuilder,
+  HubConnectionState,
+  LogLevel,
+} from '@microsoft/signalr'
+import { useEffect, useRef, useState } from 'react'
 import type { CrawlJob, PageCounts } from '../api/crawl'
 import { config } from '../config'
 
@@ -27,7 +35,6 @@ export interface JobProgressPayload {
 }
 
 const POLL_MS = 1500
-const SIGNALR_STALE_FALLBACK_MS = 8000
 
 function applyProgress(job: CrawlJob, payload: JobProgressPayload): CrawlJob {
   const pageCounts: PageCounts = {
@@ -57,34 +64,19 @@ export function useJobRealtime(opts: {
   refreshJob: () => Promise<unknown>
   refreshTree: () => Promise<unknown>
 }): { transport: LiveTransport; pollMs: number } {
-  const { jobId, job, setJob, isLive, refreshJob, refreshTree } = opts
+  const { jobId, setJob, isLive, refreshJob, refreshTree } = opts
   const [transport, setTransport] = useState<LiveTransport>('idle')
   const connectionRef = useRef<HubConnection | null>(null)
-  const lastSignalRef = useRef(0)
-  const hubReadyRef = useRef(false)
-
-  const onProgress = useCallback(
-    (raw: JobProgressPayload) => {
-      lastSignalRef.current = Date.now()
-      hubReadyRef.current = true
-      setTransport('signalr')
-      setJob((prev) => {
-        if (!prev || prev.jobId.toLowerCase() !== String(raw.jobId).toLowerCase()) return prev
-        return applyProgress(prev, {
-          ...raw,
-          jobId: String(raw.jobId),
-        })
-      })
-      // Tree still via REST — SignalR carries counts/status only.
-      void refreshTree()
-    },
-    [refreshTree, setJob],
-  )
+  const refreshJobRef = useRef(refreshJob)
+  const refreshTreeRef = useRef(refreshTree)
+  const setJobRef = useRef(setJob)
+  refreshJobRef.current = refreshJob
+  refreshTreeRef.current = refreshTree
+  setJobRef.current = setJob
 
   useEffect(() => {
     if (!jobId || !isLive) {
       setTransport('idle')
-      hubReadyRef.current = false
       const existing = connectionRef.current
       connectionRef.current = null
       if (existing) void existing.stop()
@@ -93,7 +85,6 @@ export function useJobRealtime(opts: {
 
     let cancelled = false
     setTransport('connecting')
-    hubReadyRef.current = false
 
     const hubUrl = `${config.crawlApiBaseUrl.replace(/\/$/, '')}/hubs/crawl-jobs`
     const connection = new HubConnectionBuilder()
@@ -103,32 +94,56 @@ export function useJobRealtime(opts: {
       .build()
 
     connectionRef.current = connection
-    connection.on('jobProgress', onProgress)
 
+    const onProgress = (raw: JobProgressPayload) => {
+      setTransport('signalr')
+      setJobRef.current((prev) => {
+        if (!prev || prev.jobId.toLowerCase() !== String(raw.jobId).toLowerCase()) return prev
+        return applyProgress(prev, { ...raw, jobId: String(raw.jobId) })
+      })
+      void refreshTreeRef.current()
+    }
+
+    connection.on('jobProgress', onProgress)
     connection.onreconnecting(() => {
       if (!cancelled) setTransport('polling')
     })
     connection.onreconnected(() => {
       if (cancelled) return
-      void connection.invoke('SubscribeJob', jobId).then(() => {
-        hubReadyRef.current = true
-        setTransport('signalr')
-      })
+      void connection.invoke('SubscribeJob', jobId).then(() => setTransport('signalr'))
     })
 
     ;(async () => {
-      try {
-        await connection.start()
+      // Survive React StrictMode double-invoke: first mount cleanup cancels before negotiate.
+      await new Promise((r) => setTimeout(r, 75))
+      if (cancelled) return
+
+      let lastError: unknown
+      for (let attempt = 1; attempt <= 3; attempt++) {
         if (cancelled) return
-        await connection.invoke('SubscribeJob', jobId)
-        hubReadyRef.current = true
-        lastSignalRef.current = Date.now()
-        setTransport('signalr')
-        // Bootstrap from REST once so UI is not empty before first event.
-        await refreshJob()
-        await refreshTree()
-      } catch {
-        if (!cancelled) setTransport('polling')
+        try {
+          if (connection.state !== HubConnectionState.Disconnected) {
+            await connection.stop()
+          }
+          await connection.start()
+          if (cancelled) {
+            await connection.stop()
+            return
+          }
+          await connection.invoke('SubscribeJob', jobId)
+          setTransport('signalr')
+          await refreshJobRef.current()
+          await refreshTreeRef.current()
+          return
+        } catch (err) {
+          lastError = err
+          await new Promise((r) => setTimeout(r, 150 * attempt))
+        }
+      }
+
+      if (!cancelled) {
+        console.warn('SignalR unavailable; using REST polling', lastError)
+        setTransport('polling')
       }
     })()
 
@@ -138,31 +153,29 @@ export function useJobRealtime(opts: {
       void connection.stop()
       if (connectionRef.current === connection) connectionRef.current = null
     }
-  }, [jobId, isLive, onProgress, refreshJob, refreshTree])
+  }, [jobId, isLive])
 
-  // REST fallback: always while live; slows when SignalR is healthy.
+  // REST fallback always available while live (PDF path). When SignalR is connected,
+  // keep a slower soft poll for tree consistency; badge stays SignalR.
   useEffect(() => {
     if (!jobId || !isLive) return
 
     const timer = window.setInterval(() => {
       const conn = connectionRef.current
-      const hubUp =
-        hubReadyRef.current &&
-        conn?.state === HubConnectionState.Connected &&
-        Date.now() - lastSignalRef.current < SIGNALR_STALE_FALLBACK_MS
-
-      if (hubUp) {
-        // Soft poll tree occasionally even on SignalR (progress events already refresh tree).
+      const hubConnected = conn?.state === HubConnectionState.Connected
+      if (hubConnected) {
+        setTransport((t) => (t === 'signalr' ? t : 'signalr'))
+        // Soft tree refresh only — counts come from hub events.
+        void refreshTreeRef.current()
         return
       }
-
-      if (transport !== 'connecting') setTransport('polling')
-      void refreshJob()
-      void refreshTree()
+      setTransport((t) => (t === 'connecting' ? t : 'polling'))
+      void refreshJobRef.current()
+      void refreshTreeRef.current()
     }, POLL_MS)
 
     return () => window.clearInterval(timer)
-  }, [jobId, isLive, refreshJob, refreshTree, transport, job?.status])
+  }, [jobId, isLive])
 
   return { transport, pollMs: POLL_MS }
 }
