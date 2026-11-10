@@ -134,7 +134,7 @@ UrlCrawler is a strong timed take-home (and an explicit cut list). This engine c
 | Content-Type allow-list only | Allow-list + HTML sniff + charset decode |
 | Retries via resilience; less explicit poison taxonomy in-app | `TransientCrawlException` vs poison → DLQ; metrics counters |
 | No OTEL metrics (logs/health only) | OTEL hooks + `Crawl.Worker` instruments + `progressPercent` |
-| SQL Server + MassTransit outbox | PostgreSQL / Aurora path + Amazon MQ sketch; Compose demo |
+| SQL Server + MassTransit outbox | **MassTransit 8 + RabbitMQ** on PostgreSQL/Aurora path; Amazon MQ sketch; Compose demo; `ON CONFLICT` upserts + `/health/live|ready` |
 | No assistive AI (by design) | AI overlays **assist** operators; never own links/DLR |
 
 Still not a full Scrapy port (no JS render, no broad middleware ecosystem, no spider contracts). Intentional: graded **job crawler** with Scrapy-class fetch hygiene.
