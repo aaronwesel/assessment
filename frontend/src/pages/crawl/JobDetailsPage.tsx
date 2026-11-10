@@ -1,8 +1,8 @@
 /**
  * Job Details — live progress, actionable report, tree + DLR, export, element pick, AI assist.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useCallback, useMemo, useState } from 'react'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import {
   crawlApi,
   CrawlApiError,
@@ -11,7 +11,9 @@ import {
   type JobTree,
   type PageNode,
 } from '../../api/crawl'
+import { CrawlFlowSteps } from '../../components/crawl/CrawlFlowSteps'
 import { CrawlShell } from '../../components/crawl/CrawlShell'
+import { DeepSeekGuide } from '../../components/crawl/DeepSeekGuide'
 import {
   CrawlEmpty,
   CrawlError,
@@ -25,11 +27,12 @@ import { StatusBadge } from '../../components/crawl/StatusBadge'
 import { AiAssistPanels, IncidentsPanel } from '../../crawl/ai/AiAssistPanels'
 import type { CrawlPageSnapshot } from '../../crawl/ai/crawlAiApi'
 import { formatDateTime } from '../../crawl/format'
-
-const POLL_MS = 1500
+import { JOB_DETAILS_POLL_MS, useJobLiveRefresh } from '../../crawl/useJobLiveRefresh'
 
 export function JobDetailsPage() {
   const { jobId = '' } = useParams()
+  const [searchParams] = useSearchParams()
+  const guided = searchParams.get('guided') === '1'
   const [job, setJob] = useState<CrawlJob | null>(null)
   const [tree, setTree] = useState<JobTree | null>(null)
   const [treeError, setTreeError] = useState<string | null>(null)
@@ -85,19 +88,7 @@ export function JobDetailsPage() {
     [jobId],
   )
 
-  useEffect(() => {
-    void loadJob()
-    void loadTree()
-  }, [loadJob, loadTree])
-
-  useEffect(() => {
-    if (!liveStatus || !isActiveJobStatus(liveStatus)) return
-    const timer = window.setInterval(() => {
-      void loadJob({ silent: true })
-      void loadTree({ silent: true })
-    }, POLL_MS)
-    return () => window.clearInterval(timer)
-  }, [liveStatus, loadJob, loadTree])
+  useJobLiveRefresh({ jobId, liveStatus, loadJob, loadTree })
 
   const live = !!job && isActiveJobStatus(job.status)
   const terminal = !!job && !isActiveJobStatus(job.status)
@@ -136,6 +127,12 @@ export function JobDetailsPage() {
 
       {job ? (
         <div className="crawl-details-layout crawl-rise-delay">
+          {guided || live || terminal ? (
+            <CrawlFlowSteps activeStep={live ? 5 : 6} maxReachable={6} />
+          ) : null}
+
+          <div className="crawl-details-guided-row">
+            <div className="crawl-details-primary">
           <JobSummary job={job} live={live} onCanceled={() => void loadJob()} />
 
           <JobResultsHub job={job} root={root} terminal={terminal} />
@@ -167,6 +164,14 @@ export function JobDetailsPage() {
               />
             </section>
           ) : null}
+            </div>
+            <DeepSeekGuide
+              step={live ? 4 : 5}
+              url={job.url}
+              maxDepth={job.maxDepth}
+              collapsed={!guided}
+            />
+          </div>
         </div>
       ) : null}
     </CrawlShell>
@@ -266,7 +271,7 @@ function JobSummary({
         {live ? (
           <span className="hint crawl-poll-hint">
             <span className="crawl-live-dot" aria-hidden="true" />
-            Updating every {POLL_MS / 1000}s
+            Live updates every {JOB_DETAILS_POLL_MS / 1000}s
           </span>
         ) : null}
       </div>

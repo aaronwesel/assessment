@@ -96,13 +96,24 @@ export function JobResultsHub({ job, root, terminal }: Props) {
               skipped
             </dd>
           </div>
-          <div>
-            <dt>Domain Link Ratio</dt>
+          <div className="crawl-dlr-block">
+            <dt>Domain Link Ratio (DLR)</dt>
             <dd>
-              {report.avgDomainLinkRatio !== null
-                ? `avg ${formatPercent(report.avgDomainLinkRatio)} (min ${formatPercent(report.minDomainLinkRatio)} · max ${formatPercent(report.maxDomainLinkRatio)})`
-                : '— (no parsed pages with DLR yet)'}
+              {report.avgDomainLinkRatio !== null ? (
+                <>
+                  On average,{' '}
+                  <strong>{formatPercent(report.avgDomainLinkRatio)}</strong> of links on each crawled page
+                  stayed on the same site (range {formatPercent(report.minDomainLinkRatio)} –{' '}
+                  {formatPercent(report.maxDomainLinkRatio)}).
+                </>
+              ) : (
+                '— DLR appears after the .NET worker parses links on a page.'
+              )}
             </dd>
+            <p className="hint crawl-dlr-hint">
+              DLR = internal links ÷ all links on that page. AI summaries may quote these values but never
+              recompute them.
+            </p>
           </div>
           {estimatedCost ? (
             <div>
@@ -204,6 +215,22 @@ function ReportActions({
         >
           NDJSON
         </button>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          disabled={!hasExport}
+          onClick={() => exportJobReport(report, 'md')}
+        >
+          Markdown
+        </button>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          disabled={!hasExport}
+          onClick={() => exportJobReport(report, 'html')}
+        >
+          HTML
+        </button>
       </div>
 
       <div className="crawl-retry-row">
@@ -213,11 +240,11 @@ function ReportActions({
           className="btn btn-primary"
           onClick={() =>
             navigate(
-              `/crawl/welcome?url=${encodeURIComponent(job.url)}&depth=${job.maxDepth}&retry=depth`,
+              `/crawl/welcome?url=${encodeURIComponent(job.url)}&depth=${job.maxDepth + 1}&advanced=1&retry=depth`,
             )
           }
         >
-          Deeper crawl
+          Try again with more options
         </button>
         <button
           type="button"

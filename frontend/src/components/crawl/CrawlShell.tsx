@@ -4,6 +4,7 @@
  */
 import type { ReactNode } from 'react'
 import { Link, NavLink } from 'react-router-dom'
+import { TrailmapLogo } from '../brand/TrailmapLogo'
 
 type Props = {
   title: string
@@ -25,7 +26,9 @@ export function CrawlShell({ title, lede, wide, children, actions }: Props) {
       <div className="crawl-console-inner crawl-rise">
         <header className="crawl-console-top">
           <div className="crawl-brand-block">
-            <p className="crawl-kicker">Assessment · Crawl</p>
+            <p className="crawl-kicker">
+              <TrailmapLogo compact className="crawl-kicker-logo" /> Assessment job crawler
+            </p>
             <h1 className="crawl-console-title">{title}</h1>
             {lede ? <p className="crawl-lede">{lede}</p> : null}
           </div>
@@ -50,6 +53,9 @@ export function CrawlShell({ title, lede, wide, children, actions }: Props) {
           >
             History
           </NavLink>
+          <Link to="/crawl/welcome" className="crawl-subnav-link">
+            Guided
+          </Link>
           <Link to="/" className="crawl-subnav-link crawl-subnav-quiet">
             Landing
           </Link>

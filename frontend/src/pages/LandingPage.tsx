@@ -1,10 +1,26 @@
 /**
- * Public marketing landing — crawler product hero, per-page pricing, wizard CTA.
+ * Public landing — single hero, Trailmap brand, pricing + one primary CTA (no hero card clutter).
  */
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { fetchCrawlPricing, type CrawlPricing } from '../api/growth'
+import { TrailmapLogo } from '../components/brand/TrailmapLogo'
+
+const HOW_IT_WORKS = [
+  {
+    title: 'Paste a start URL',
+    body: 'We queue your seed page on RabbitMQ and walk only internal HTML links — no guessing from AI.',
+  },
+  {
+    title: 'Workers crawl & measure',
+    body: 'Each parsed page gets Domain Link Ratio in .NET: internal links ÷ all links on that page.',
+  },
+  {
+    title: 'Export the tree',
+    body: 'Download CSV, JSON, or a readable report; retry with deeper depth or login assist when needed.',
+  },
+] as const
 
 export function LandingPage() {
   const { isAuthenticated } = useAuth()
@@ -14,90 +30,97 @@ export function LandingPage() {
     void fetchCrawlPricing().then(setPricing)
   }, [])
 
+  const perPage = pricing?.display_per_page ?? '$0.02'
+  const examplePages = 24
+  const exampleCost = pricing ? formatExampleCost(pricing, examplePages) : 'about half a dollar'
+
   return (
-    <main className="landing landing-crawl">
-      <section className="landing-hero" aria-labelledby="landing-brand">
-        <div className="landing-atmosphere" aria-hidden="true">
-          <div className="landing-orb landing-orb-a" />
-          <div className="landing-orb landing-orb-b" />
-          <div className="landing-grid" />
+    <main className="landing landing-trailmap">
+      <p className="landing-nav-row">
+        <Link to="/crawl/history" className="landing-nav-link">
+          History
+        </Link>
+        {isAuthenticated ? null : (
+          <Link to="/login" className="landing-nav-link">
+            Sign in
+          </Link>
+        )}
+      </p>
+
+      <section className="landing-hero-solo" aria-labelledby="landing-headline">
+        <div className="landing-aurora" aria-hidden="true">
+          <div className="landing-aurora-band" />
+          <div className="landing-aurora-mesh" />
+          <MotionNodes />
         </div>
 
-        <div className="landing-hero-copy">
-          <p className="landing-kicker">
-            <img src="/favicon.svg" alt="" className="landing-logo" width={28} height={28} />
-            Job-based web crawler
-          </p>
-          <h1 id="landing-brand" className="landing-brand">
-            Assessment Crawl
+        <div className="landing-hero-inner">
+          <TrailmapLogo className="landing-wordmark" />
+
+          <h1 id="landing-headline" className="landing-headline">
+            Map every internal link on a site — with live progress and plain-language results.
           </h1>
-          <p className="landing-tagline">
-            Start a URL, walk internal links with RabbitMQ workers, and read Domain Link Ratio on every
-            page — with AI help when results are empty or behind login.
+
+          <p className="landing-tagline-wide">
+            Trailmap Crawl is the assessment job crawler: queue a URL, watch the page tree grow, and understand{' '}
+            <strong>Domain Link Ratio</strong> without reading a spec sheet.
           </p>
 
-          {pricing ? (
-            <p className="landing-price">
-              <strong>{pricing.display_per_page}</strong> per page (Stripe test meter){' '}
-              <span className="hint">· anonymous crawls OK locally</span>
-            </p>
-          ) : null}
+          <p className="landing-pricing-callout">
+            <span className="landing-price-chip">{perPage} per page crawled</span>
+            <span className="hint">
+              Example: a depth‑2 demo on books.toscrape.com (~{examplePages} pages) ≈ {exampleCost} in Stripe test
+              mode.
+            </span>
+          </p>
 
-          <div className="landing-cta">
-            <Link className="btn btn-primary landing-btn" to="/crawl/welcome">
-              Guided setup
+          <div className="landing-cta-solo">
+            <Link className="btn btn-primary landing-cta-main" to="/crawl/welcome">
+              Start guided crawl
             </Link>
-            <Link className="btn btn-ghost landing-btn" to="/crawl">
-              Start crawl
-            </Link>
-            {isAuthenticated ? (
-              <Link className="btn btn-ghost landing-btn" to="/crawl/history">
-                History
+            {!isAuthenticated ? (
+              <Link className="btn btn-ghost" to="/register">
+                Save jobs to your account
               </Link>
             ) : (
-              <>
-                <Link className="btn btn-ghost landing-btn" to="/register">
-                  Register to save jobs
-                </Link>
-                <Link className="btn btn-ghost landing-btn" to="/login">
-                  Sign in
-                </Link>
-              </>
+              <Link className="btn btn-ghost" to="/crawl/history">
+                View my history
+              </Link>
             )}
           </div>
-        </div>
 
-        <div className="landing-visual" aria-hidden="true">
-          <div className="landing-panel landing-panel-crawl">
-            <span className="landing-panel-label">What you get</span>
-            <ul className="landing-panel-list">
-              <li>Live progress + page tree</li>
-              <li>Domain Link Ratio meters</li>
-              <li>CSV / JSON export</li>
-              <li>Empty-result AI diagnosis</li>
-              <li>Element pick (CSS / XPath)</li>
-              <li>Login retry assist</li>
-            </ul>
-          </div>
+          <ol className="landing-steps-inline" aria-label="How it works in three steps">
+            {HOW_IT_WORKS.map((item, i) => (
+              <li key={item.title} className="landing-step-inline crawl-rise" style={{ animationDelay: `${0.12 * i}s` }}>
+                <span className="landing-step-num">{i + 1}</span>
+                <div>
+                  <strong>{item.title}</strong>
+                  <p>{item.body}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
         </div>
       </section>
 
-      <section className="landing-strip" aria-label="How it works">
-        <ol className="landing-how">
-          <li>
-            <strong>Queue</strong>
-            <span>.NET API accepts the job and enqueues the root page on RabbitMQ.</span>
-          </li>
-          <li>
-            <strong>Crawl</strong>
-            <span>Workers fetch HTML, normalize URLs, and follow internal links deterministically.</span>
-          </li>
-          <li>
-            <strong>Results</strong>
-            <span>Job Details shows DLR, exports, and AI-guided retry when pages are missing.</span>
-          </li>
-        </ol>
-      </section>
+      <p className="landing-footnote hint">
+        Quick path for experts: <Link to="/crawl">Start crawl</Link> · AI advises only; link parsing stays in .NET.
+      </p>
     </main>
   )
+}
+
+function MotionNodes() {
+  return (
+    <>
+      <span className="landing-node landing-node-a" />
+      <span className="landing-node landing-node-b" />
+      <span className="landing-node landing-node-c" />
+    </>
+  )
+}
+
+function formatExampleCost(pricing: CrawlPricing, pages: number): string {
+  const cents = pricing.price_per_page_cents * pages
+  return cents < 100 ? `${cents}¢` : `$${(cents / 100).toFixed(2)}`
 }

@@ -66,6 +66,50 @@ function crawlAiBase(): string {
   return config.crawlApiBaseUrl.replace(/\/$/, '')
 }
 
+export type SetupPreviewResponse = {
+  normalizedUrl: string
+  urlValid: boolean
+  reachable: boolean | null
+  httpStatus: number | null
+  likelyLoginWall: boolean
+  observations: string[]
+  stepAdvice: string
+  modelAnswer: string | null
+  usedModel: boolean
+  degradedReason: string | null
+}
+
+export async function fetchSetupPreview(body: {
+  url: string
+  maxDepth: number
+  wizardStep: number
+  question?: string
+}): Promise<SetupPreviewResponse> {
+  const res = await fetch(`${crawlAiBase()}/api/ai/setup/preview`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      url: body.url,
+      maxDepth: body.maxDepth,
+      wizardStep: body.wizardStep,
+      question: body.question,
+    }),
+  })
+  const raw = await parseJson<Record<string, unknown>>(res)
+  return {
+    normalizedUrl: String(raw.normalizedUrl ?? ''),
+    urlValid: !!raw.urlValid,
+    reachable: raw.reachable == null ? null : !!raw.reachable,
+    httpStatus: raw.httpStatus == null ? null : Number(raw.httpStatus),
+    likelyLoginWall: !!raw.likelyLoginWall,
+    observations: Array.isArray(raw.observations) ? raw.observations.map(String) : [],
+    stepAdvice: String(raw.stepAdvice ?? ''),
+    modelAnswer: raw.modelAnswer == null ? null : String(raw.modelAnswer),
+    usedModel: !!raw.usedModel,
+    degradedReason: raw.degradedReason == null ? null : String(raw.degradedReason),
+  }
+}
+
 export async function fetchAiFeatures(): Promise<AiFeatureFlags> {
   const res = await fetch(`${crawlAiBase()}/api/ai/features`)
   const raw = await parseJson<Record<string, boolean>>(res)

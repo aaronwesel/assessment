@@ -7,6 +7,7 @@ using Crawl.Ai.Integrations;
 using Crawl.Ai.LoginAssist;
 using Crawl.Ai.Models;
 using Crawl.Ai.Options;
+using Crawl.Ai.SetupGuide;
 using Crawl.Ai.Summarization;
 using Crawl.Domain.Incidents;
 using Microsoft.AspNetCore.Builder;
@@ -58,6 +59,23 @@ public static class EndpointRouteBuilderExtensions
             var items = await monitor.ListForJobAsync(jobId, 20, ct).ConfigureAwait(false);
             var dtos = items.Select(ToDto).ToList();
             return Results.Ok(new JobIncidentsResponse(jobId, dtos.FirstOrDefault(), dtos));
+        });
+
+        group.MapPost("/setup/preview", async (
+            SetupPreviewBody body,
+            IOptions<CrawlAiOptions> options,
+            ISetupGuideService service,
+            CancellationToken ct) =>
+        {
+            if (!options.Value.Enabled)
+            {
+                return Results.Json(new { error = "crawl_ai_disabled" }, statusCode: StatusCodes.Status503ServiceUnavailable);
+            }
+
+            var resp = await service.PreviewAsync(
+                new SetupGuideRequest(body.Url ?? "", body.MaxDepth ?? 2, body.WizardStep ?? 0, body.Question),
+                ct).ConfigureAwait(false);
+            return Results.Ok(resp);
         });
 
         group.MapPost("/jobs/{jobId:guid}/field-finder", async (
@@ -251,6 +269,7 @@ public static class EndpointRouteBuilderExtensions
         i.AlertSent,
         i.CreatedAt);
 
+    public sealed record SetupPreviewBody(string? Url, int? MaxDepth, int? WizardStep, string? Question);
     public sealed record FieldFinderBody(Guid? PageId, string? PageUrl, string? HtmlOrText, string? GoalHint);
     public sealed record LoginDetectBody(string? PageUrl, string? HtmlOrText);
     public sealed record LoginConfirmBody(string AuditEventId, int StepIndex, bool Approved, string? CredentialVaultRef, string? OperatorId);

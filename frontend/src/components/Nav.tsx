@@ -4,6 +4,7 @@
  */
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
+import { TrailmapLogo } from './brand/TrailmapLogo'
 
 function isPlatformAdmin(roles: string[] | undefined): boolean {
   if (!roles) return false
@@ -16,7 +17,8 @@ export function Nav() {
   return (
     <header className="nav">
       <Link to="/" className="nav-brand">
-        Assessment
+        <TrailmapLogo compact className="nav-brand-logo" />
+        <span className="nav-brand-text">Trailmap</span>
       </Link>
       <div className="nav-actions">
         <Link className="nav-link" to="/crawl">

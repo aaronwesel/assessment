@@ -134,8 +134,8 @@ export function StartCrawlPage() {
             Absolute http(s) address. HTML pages only — the worker ignores non-HTML.
           </p>
           {urlErrors ? (
-            <p id="crawl-url-error" className="form-error">
-              {urlErrors.join(' ')}
+            <p id="crawl-url-error" className="crawl-soft-note">
+              {urlErrors.join(' ')} — try example.com and we will add https:// for you.
             </p>
           ) : null}
 

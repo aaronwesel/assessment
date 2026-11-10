@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 48" fill="none" role="img" aria-label="Trailmap Crawl">
+  <rect width="40" height="40" x="4" y="4" rx="10" fill="#0c1b2e"/>
+  <circle cx="24" cy="16" r="4" fill="#00e5b8"/>
+  <circle cx="16" cy="32" r="3" fill="#4d9fff"/>
+  <circle cx="32" cy="32" r="3" fill="#4d9fff"/>
+  <path stroke="#00e5b8" stroke-width="1.6" stroke-linecap="round" d="M24 19v5M21 26l-3 3M27 26l3 3"/>
+  <text x="56" y="30" fill="#e8eef8" font-family="DM Serif Display, Georgia, serif" font-size="26">Trailmap</text>
+  <text x="168" y="30" fill="#00e5b8" font-family="IBM Plex Sans, sans-serif" font-size="11" letter-spacing="3">CRAWL</text>
+</svg>

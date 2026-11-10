@@ -7,6 +7,7 @@ using Crawl.Ai.Incidents;
 using Crawl.Ai.Integrations;
 using Crawl.Ai.LoginAssist;
 using Crawl.Ai.Options;
+using Crawl.Ai.SetupGuide;
 using Crawl.Ai.Summarization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -60,6 +61,12 @@ public static class ServiceCollectionExtensions
                 }
             });
 
+        services.AddHttpClient("crawl-setup-guide", client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(15);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("TrailmapCrawl-SetupGuide/1.0");
+        });
+
         services.AddHttpClient<IDeepSeekClient, DeepSeekClient>((sp, client) =>
         {
             var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<CrawlAiOptions>>().Value;
@@ -74,6 +81,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IFieldFinderService, FieldFinderService>();
         services.AddScoped<IResultSummarizer, ResultSummarizer>();
         services.AddScoped<IAskTheCrawlService, AskTheCrawlService>();
+        services.AddScoped<ISetupGuideService, SetupGuideService>();
         services.AddScoped<IAgentOrchestrator, AgentOrchestrator>();
         services.AddScoped<IPayerPortalClient, StubPayerPortalClient>();
         services.AddScoped<IClearinghouseClient, StubClearinghouseClient>();

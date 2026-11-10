@@ -235,6 +235,22 @@ Config: `CrawlAi:IncidentMonitorEnabled`, `CrawlEgress:Proxies`, `Crawl:Alerts:*
 
 ---
 
+## Product UX (Trailmap)
+
+React routes (unchanged contract, redesigned surfaces):
+
+| Path | Experience |
+|------|------------|
+| `/` | **Landing** — Trailmap wordmark, 3-step “how it works”, per-page Stripe test pricing + example cost, single **Start guided crawl** CTA |
+| `/crawl/welcome` | **Guided flow** — steps 1–4 (URL → probe → scope → confirm); persistent **Crawl guide** (`POST /api/ai/setup/preview`); **Advanced options** drawer |
+| `/crawl` | Expert quick start (still Start → Job Details → History) |
+| `/crawl/jobs/:id` | Steps 5–6: live progress + readable DLR summary, exports (CSV/JSON/NDJSON/Markdown/HTML), tree, element pick |
+| `/crawl/history` | Paginated history with empty/error states |
+
+**Rules:** Assistive AI (DeepSeek when `DEEPSEEK_API_KEY` is set) coaches operators only — Domain Link Ratio, URL normalization, and link graph edges remain in `Crawl.Domain` / Worker.
+
+---
+
 ## OpenTelemetry
 
 OTLP hooks are registered on Api/Worker; export when `OTEL_EXPORTER_OTLP_ENDPOINT` is set.

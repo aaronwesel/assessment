@@ -143,7 +143,53 @@ function downloadBlob(filename: string, mime: string, body: string) {
   URL.revokeObjectURL(url)
 }
 
-export function exportJobReport(report: CrawlJobReport, format: 'csv' | 'json' | 'ndjson') {
+function dlrPlainSummary(report: CrawlJobReport): string {
+  const avg =
+    report.avgDomainLinkRatio != null
+      ? `${Math.round(report.avgDomainLinkRatio * 100)}%`
+      : 'not yet computed'
+  return [
+    `# Crawl report ${report.jobId}`,
+    ``,
+    `Seed: ${report.seedUrl}`,
+    `Status: ${report.status}`,
+    ``,
+    `Domain Link Ratio (DLR) is the share of **links on a page that stay on the same host** — computed by the .NET worker, not AI.`,
+    `Average DLR across parsed pages: **${avg}**.`,
+    ``,
+    `Pages done: ${report.pagesDone}; failed: ${report.pagesFailed}.`,
+    ``,
+    report.failedPages.length
+      ? `## Failures\n${report.failedPages.map((p) => `- ${p.url}: ${p.error ?? p.status}`).join('\n')}`
+      : '',
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
+function htmlReport(report: CrawlJobReport): string {
+  const rows = report.rows
+    .map(
+      (r) =>
+        `<tr><td>${escapeHtml(r.url)}</td><td>${r.depth}</td><td>${escapeHtml(r.status)}</td><td>${r.domainLinkRatio ?? ''}</td><td>${escapeHtml(r.error ?? '')}</td></tr>`,
+    )
+    .join('')
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Crawl ${report.jobId}</title>
+<style>body{font-family:system-ui,sans-serif;max-width:920px;margin:2rem auto;line-height:1.5}
+table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:.4rem .5rem;text-align:left;font-size:.9rem}</style>
+</head><body>
+<h1>Trailmap crawl report</h1>
+<p><strong>DLR</strong> = internal links ÷ all links on a page (from .NET worker).</p>
+<p>Seed: ${escapeHtml(report.seedUrl)} · Status: ${escapeHtml(report.status)}</p>
+<table><thead><tr><th>URL</th><th>Depth</th><th>Status</th><th>DLR</th><th>Error</th></tr></thead><tbody>${rows}</tbody></table>
+</body></html>`
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+export function exportJobReport(report: CrawlJobReport, format: 'csv' | 'json' | 'ndjson' | 'md' | 'html') {
   const stamp = report.jobId.slice(0, 8)
   if (format === 'json') {
     downloadBlob(
@@ -156,6 +202,14 @@ export function exportJobReport(report: CrawlJobReport, format: 'csv' | 'json' |
   if (format === 'ndjson') {
     const lines = report.rows.map((r) => JSON.stringify(r)).join('\n')
     downloadBlob(`crawl-${stamp}.ndjson`, 'application/x-ndjson', lines)
+    return
+  }
+  if (format === 'md') {
+    downloadBlob(`crawl-${stamp}.md`, 'text/markdown', dlrPlainSummary(report))
+    return
+  }
+  if (format === 'html') {
+    downloadBlob(`crawl-${stamp}.html`, 'text/html', htmlReport(report))
     return
   }
   const header = [

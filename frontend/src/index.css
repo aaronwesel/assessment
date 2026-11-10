@@ -1,16 +1,25 @@
 :root {
-  color-scheme: light;
-  --bg: #f7f6f3;
-  --bg-accent: #ebe8e1;
-  --ink: #1c1b19;
-  --muted: #5c5a55;
-  --line: #d4d0c8;
-  --primary: #1f4d3a;
-  --primary-ink: #f7f6f3;
-  --danger: #8b2e2e;
-  --radius: 6px;
-  --font: "Source Sans 3", "Segoe UI", sans-serif;
-  --display: "Fraunces", Georgia, serif;
+  /* Trailmap design tokens — navy/teal/cyan (no purple-on-white or terracotta broadsheet) */
+  color-scheme: dark;
+  --bg: #060d18;
+  --bg-accent: #0f1a2e;
+  --surface: #131f35;
+  --surface-elevated: #182640;
+  --ink: #e8eef8;
+  --muted: #93a4bd;
+  --line: #2a3d5c;
+  --primary: #00e5b8;
+  --primary-dim: color-mix(in srgb, var(--primary) 65%, var(--bg));
+  --primary-ink: #041018;
+  --accent: #4d9fff;
+  --accent-glow: color-mix(in srgb, var(--accent) 45%, transparent);
+  --danger: #ff8a8a;
+  --radius: 10px;
+  --font: "IBM Plex Sans", "Segoe UI", sans-serif;
+  --display: "DM Serif Display", Georgia, serif;
+  --motion-rise: 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-drift: 16s ease-in-out infinite alternate;
+  --shadow-panel: 0 12px 40px rgba(0, 0, 0, 0.35);
 }
 
 *,
@@ -30,10 +39,10 @@ body {
   font-family: var(--font);
   color: var(--ink);
   background:
-    radial-gradient(1200px 500px at 10% -10%, #e4efe8 0%, transparent 55%),
-    radial-gradient(900px 420px at 100% 0%, #efe8dc 0%, transparent 50%),
+    radial-gradient(ellipse 120% 80% at 50% -20%, #142a4a 0%, transparent 55%),
+    radial-gradient(ellipse 80% 50% at 100% 50%, #0d2840 0%, transparent 45%),
     var(--bg);
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 a {
@@ -61,7 +70,17 @@ code {
   gap: 1rem;
   padding: 0.9rem 1.5rem;
   border-bottom: 1px solid var(--line);
-  background: color-mix(in srgb, var(--bg) 88%, white);
+  background: color-mix(in srgb, var(--bg) 92%, var(--bg-accent));
+}
+
+.nav-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.nav-brand-logo .trailmap-logo-bg {
+  color: #0c1b2e;
 }
 
 .nav-brand {
@@ -167,10 +186,11 @@ code {
   color: var(--muted);
 }
 
-.field input {
+.field input,
+.field textarea {
   font: inherit;
   color: var(--ink);
-  background: #fff;
+  background: var(--bg-accent);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 0.65rem 0.75rem;
@@ -213,7 +233,7 @@ code {
 
 .btn-social {
   width: 100%;
-  background: #fff;
+  background: var(--surface);
   border-color: var(--line);
   color: var(--ink);
   text-align: center;
@@ -415,7 +435,7 @@ code {
   width: min(100%, 280px);
   padding: 1.35rem 1.4rem 1.5rem;
   border: 1px solid color-mix(in srgb, var(--line) 70%, var(--primary));
-  background: color-mix(in srgb, #fff 72%, transparent);
+  background: color-mix(in srgb, var(--surface-elevated) 88%, transparent);
   backdrop-filter: blur(10px);
   box-shadow: 0 18px 40px color-mix(in srgb, var(--ink) 6%, transparent);
 }
@@ -567,7 +587,7 @@ code {
   padding: 1rem 1.05rem;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: color-mix(in srgb, #fff 70%, transparent);
+  background: color-mix(in srgb, var(--surface-elevated) 85%, transparent);
 }
 
 .sa-tile:hover {
@@ -1029,8 +1049,12 @@ code {
 .crawl-state-loading p { margin: 0; }
 
 .crawl-panel-block {
-  padding: 1.15rem 0 0.25rem;
-  border-top: 1px solid var(--line);
+  padding: 1.25rem 1.1rem 1.1rem;
+  margin-bottom: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-panel);
 }
 
 .crawl-section-title {
@@ -1608,6 +1632,473 @@ code {
   }
 }
 
+/* —— Trailmap UX redesign —— */
+.landing-trailmap {
+  flex: 1;
+  padding: 0 0 2rem;
+}
+
+.landing-nav-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  padding: 0.75rem clamp(1rem, 4vw, 2.5rem);
+  margin: 0;
+}
+
+.landing-nav-link {
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.landing-nav-link:hover {
+  color: var(--primary);
+}
+
+.landing-hero-solo {
+  position: relative;
+  min-height: calc(100vh - 7rem);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(2rem, 6vw, 4rem) clamp(1.25rem, 5vw, 3rem);
+  overflow: hidden;
+}
+
+.landing-aurora {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.landing-aurora-band {
+  position: absolute;
+  inset: -20% -10%;
+  background: conic-gradient(from 210deg at 50% 40%, #0e3d5c, #0a1220, #124b3a, #0a1220);
+  opacity: 0.55;
+  animation: landing-aurora-spin 28s linear infinite;
+}
+
+.landing-aurora-mesh {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--primary) 22%, transparent) 1px, transparent 0);
+  background-size: 32px 32px;
+  mask-image: radial-gradient(ellipse at 50% 45%, #000 15%, transparent 70%);
+  opacity: 0.35;
+  animation: landing-fade 10s ease-in-out infinite alternate;
+}
+
+.landing-node {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 24px var(--primary);
+  animation: landing-node-float 6s ease-in-out infinite alternate;
+}
+
+.landing-node-a {
+  top: 22%;
+  left: 18%;
+}
+
+.landing-node-b {
+  top: 58%;
+  right: 22%;
+  background: var(--accent);
+  animation-delay: -2s;
+}
+
+.landing-node-c {
+  bottom: 18%;
+  left: 42%;
+  animation-delay: -4s;
+}
+
+@keyframes landing-aurora-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes landing-node-float {
+  to {
+    transform: translate(12px, -18px);
+  }
+}
+
+.landing-hero-inner {
+  position: relative;
+  z-index: 1;
+  max-width: 46rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.1rem;
+}
+
+.trailmap-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  color: #0c1b2e;
+}
+
+.trailmap-logo-mark {
+  flex-shrink: 0;
+}
+
+.trailmap-logo-type {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.1;
+}
+
+.trailmap-logo-name {
+  font-family: var(--display);
+  font-size: 1.35rem;
+  color: var(--ink);
+}
+
+.trailmap-logo-sub {
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--primary);
+}
+
+.landing-wordmark {
+  transform: scale(1.15);
+}
+
+.landing-headline {
+  font-family: var(--display);
+  font-size: clamp(2rem, 5vw, 2.85rem);
+  line-height: 1.12;
+  margin: 0;
+  letter-spacing: -0.02em;
+  animation: landing-rise var(--motion-rise) ease-out;
+  background: linear-gradient(120deg, var(--ink) 0%, var(--primary) 55%, var(--accent) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.landing-tagline-wide {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1.08rem;
+  max-width: 38rem;
+  animation: landing-rise 1s ease-out 0.08s both;
+}
+
+.landing-pricing-callout {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  align-items: center;
+  animation: landing-rise 1s ease-out 0.16s both;
+}
+
+.landing-price-chip {
+  display: inline-block;
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--primary) 55%, var(--line));
+  background: color-mix(in srgb, var(--primary) 12%, var(--bg-accent));
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.landing-cta-solo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  justify-content: center;
+  animation: landing-rise 1s ease-out 0.22s both;
+}
+
+.landing-cta-main {
+  min-width: 12rem;
+  font-weight: 600;
+  box-shadow: 0 0 32px color-mix(in srgb, var(--primary) 35%, transparent);
+}
+
+.landing-steps-inline {
+  list-style: none;
+  margin: 1.5rem 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  text-align: left;
+  width: min(52rem, 100%);
+}
+
+.landing-step-inline {
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--bg-accent) 85%, transparent);
+}
+
+.landing-step-inline p {
+  margin: 0.35rem 0 0;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+.landing-step-num {
+  display: inline-flex;
+  width: 1.6rem;
+  height: 1.6rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--primary-ink);
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+
+.landing-footnote {
+  text-align: center;
+  padding: 0 1rem 1.5rem;
+}
+
+.crawl-flow-steps {
+  list-style: none;
+  margin: 0 0 1.25rem;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.crawl-flow-step {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.5rem 0.4rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  font-size: 0.72rem;
+  color: var(--muted);
+  background: var(--bg-accent);
+}
+
+.crawl-flow-step.is-active {
+  border-color: var(--primary);
+  color: var(--ink);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 40%, transparent);
+}
+
+.crawl-flow-step.is-done {
+  border-color: color-mix(in srgb, var(--primary) 35%, var(--line));
+}
+
+.crawl-flow-step.is-locked {
+  opacity: 0.45;
+}
+
+.crawl-flow-num {
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.crawl-guided-layout,
+.crawl-details-guided-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.crawl-details-primary {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.crawl-guide {
+  position: sticky;
+  top: 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--bg-accent) 90%, var(--bg));
+  overflow: hidden;
+}
+
+.crawl-guide-head {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.crawl-guide-title {
+  margin: 0;
+  font-size: 1rem;
+  font-family: var(--display);
+}
+
+.crawl-guide-pulse {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--primary);
+  margin-top: 0.35rem;
+  animation: crawl-pulse 2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+.crawl-guide-body {
+  padding: 0.85rem 1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.crawl-guide-obs {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+.crawl-guide-flag {
+  color: var(--accent);
+}
+
+.crawl-guide-soft-warn {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--accent);
+}
+
+.crawl-soft-note {
+  margin: 0.35rem 0 0;
+  color: var(--accent);
+  font-size: 0.92rem;
+}
+
+.crawl-guide-answer {
+  padding: 0.65rem;
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--primary) 8%, var(--bg));
+  border: 1px solid var(--line);
+}
+
+.crawl-guide-answer-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.crawl-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(2, 6, 12, 0.65);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.crawl-drawer {
+  width: min(420px, 100%);
+  height: 100%;
+  background: var(--bg);
+  border-left: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  animation: crawl-drawer-in 0.28s ease-out;
+}
+
+@keyframes crawl-drawer-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.crawl-drawer-head,
+.crawl-drawer-foot {
+  padding: 1rem 1.15rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.crawl-drawer-foot {
+  border-bottom: none;
+  border-top: 1px solid var(--line);
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.crawl-drawer-body {
+  flex: 1;
+  overflow: auto;
+  padding: 1rem 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.crawl-drawer-close {
+  margin-top: 0.5rem;
+}
+
+.crawl-checkbox,
+.crawl-radio {
+  flex-direction: row;
+  align-items: center;
+}
+
+.crawl-scope-row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.crawl-kicker-logo {
+  vertical-align: middle;
+  margin-right: 0.35rem;
+}
+
+.crawl-orb-a {
+  background: radial-gradient(circle at 35% 35%, color-mix(in srgb, var(--primary) 35%, transparent) 0%, transparent 70%);
+}
+
+.crawl-orb-b {
+  background: radial-gradient(circle at 60% 40%, color-mix(in srgb, var(--accent) 35%, transparent) 0%, transparent 68%);
+}
+
+@media (max-width: 900px) {
+  .landing-steps-inline,
+  .crawl-flow-steps {
+    grid-template-columns: 1fr;
+  }
+
+  .crawl-guided-layout,
+  .crawl-details-guided-row {
+    grid-template-columns: 1fr;
+  }
+
+  .crawl-guide {
+    position: static;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .crawl-orb,
   .crawl-rise,
@@ -1616,7 +2107,10 @@ code {
   .crawl-live-dot,
   .crawl-spinner,
   .crawl-progress-seg,
-  .crawl-job-row {
+  .crawl-job-row,
+  .landing-aurora-band,
+  .landing-node,
+  .crawl-drawer {
     animation: none;
     transition: none;
   }

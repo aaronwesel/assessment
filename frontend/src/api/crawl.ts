@@ -87,6 +87,7 @@ export interface PagedResult<T> {
 export interface CreateJobRequest {
   url: string
   maxDepth?: number
+  maxPages?: number
 }
 
 export interface ProblemDetails {
