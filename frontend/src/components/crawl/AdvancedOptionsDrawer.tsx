@@ -7,7 +7,7 @@ import {
   type CrawlAdvancedOptions,
   saveAdvancedToStorage,
 } from './crawlAdvancedOptions'
-import { ABSOLUTE_MAX_PAGES } from './crawlLimits'
+import { ABSOLUTE_MAX_PAGES, clampMaxPages } from './crawlPageLimits'
 
 type Props = {
   open: boolean
@@ -73,7 +73,7 @@ export function AdvancedOptionsDrawer({ open, onClose, value, onChange }: Props)
               min={1}
               max={ABSOLUTE_MAX_PAGES}
               value={draft.maxPages}
-              onChange={(e) => patch({ maxPages: Number(e.target.value) })}
+              onChange={(e) => patch({ maxPages: clampMaxPages(Number(e.target.value)) })}
             />
           </label>
           <p className="hint">Hard stop for queue size and Stripe test meter exposure.</p>
@@ -140,16 +140,7 @@ export function AdvancedOptionsDrawer({ open, onClose, value, onChange }: Props)
         </div>
 
         <footer className="crawl-drawer-foot">
-          <button
-            type="button"
-            className="btn btn-ghost"
-            onClick={() => {
-              const next = { ...DEFAULT_ADVANCED }
-              setDraft(next)
-              onChange(next)
-              saveAdvancedToStorage(next)
-            }}
-          >
+          <button type="button" className="btn btn-ghost" onClick={() => onChange({ ...DEFAULT_ADVANCED })}>
             Reset defaults
           </button>
           <button type="button" className="btn btn-primary" onClick={save}>

@@ -17,7 +17,11 @@ import {
   saveAdvancedToStorage,
   type CrawlAdvancedOptions,
 } from '../../components/crawl/crawlAdvancedOptions'
-import { ABSOLUTE_MAX_PAGES, DEFAULT_MAX_PAGES } from '../../components/crawl/crawlLimits'
+import {
+  ABSOLUTE_MAX_PAGES,
+  DEFAULT_MAX_PAGES,
+  clampMaxPages,
+} from '../../components/crawl/crawlPageLimits'
 
 function coerceUrl(input: string): string {
   const trimmed = input.trim()
@@ -57,7 +61,6 @@ export function WelcomeWizardPage() {
     void fetchCrawlPricing().then(setPricing)
   }, [])
 
-  // URL query seeds step/drawer once; do not re-apply when advanced prefs change.
   useEffect(() => {
     if (params.get('retry') === 'login') setStep(0)
     const stepParam = params.get('step')
@@ -66,38 +69,19 @@ export function WelcomeWizardPage() {
       if (!Number.isNaN(n)) setStep(Math.min(3, Math.max(0, n)))
     }
     if (params.get('advanced') === '1') setDrawerOpen(true)
-  }, [params])
-
-  useEffect(() => {
     saveAdvancedToStorage(advanced)
-  }, [advanced])
+  }, [params, advanced])
 
   const goNext = () => {
-    if (step === 0) {
-      if (!urlInput.trim()) {
-        setSoftNote('Paste a site like books.toscrape.com — we will add https:// if needed.')
+    if (step === 0 && urlInput.trim() && !urlLooksValid) {
+      const coerced = coerceUrl(urlInput)
+      if (coerced !== urlInput) {
+        setUrlInput(coerced)
+        setSoftNote('We added https:// for you — click Continue when the address looks right.')
         return
       }
-      if (!urlLooksValid) {
-        const coerced = coerceUrl(urlInput)
-        if (coerced !== urlInput) {
-          setUrlInput(coerced)
-          try {
-            const parsed = new URL(coerced)
-            if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-              setSoftNote(null)
-              setStep(1)
-              return
-            }
-          } catch {
-            /* fall through */
-          }
-          setSoftNote('We added https:// for you — click Continue when the address looks right.')
-          return
-        }
-        setSoftNote('Try a host with a dot, like example.com or https://books.toscrape.com')
-        return
-      }
+      setSoftNote('Try a host with a dot, like example.com or https://books.toscrape.com')
+      return
     }
     setSoftNote(null)
     setStep((s) => Math.min(s + 1, 3))
@@ -105,11 +89,6 @@ export function WelcomeWizardPage() {
 
   async function submit(event: FormEvent) {
     event.preventDefault()
-    // Enter in early steps advances the wizard — never skip straight to Start crawl.
-    if (step < 3) {
-      goNext()
-      return
-    }
     if (!urlLooksValid) {
       setSoftNote('We need a reachable https address — we can fix missing https:// automatically.')
       setStep(0)
@@ -132,11 +111,10 @@ export function WelcomeWizardPage() {
   }
 
   const estPages = Math.min(advanced.maxPages, Math.pow(3, advanced.maxDepth + 1))
-  const freePages = pricing?.free_pages_allowance ?? 5000
   const estCost =
     pricing && estPages
-      ? `up to ~${estPages} pages-with-results × ${pricing.display_per_page} (after ${freePages.toLocaleString()} free)`
-      : pricing?.display_per_page ?? 'per page-with-results'
+      ? `up to ~${estPages} pages × ${pricing.display_per_page}`
+      : pricing?.display_per_page ?? 'per page'
 
   return (
     <CrawlShell
@@ -200,6 +178,10 @@ export function WelcomeWizardPage() {
                     <dt>Planned depth</dt>
                     <dd>{advanced.maxDepth}</dd>
                   </div>
+                  <div>
+                    <dt>Page budget</dt>
+                    <dd>up to {advanced.maxPages} pages (max {ABSOLUTE_MAX_PAGES})</dd>
+                  </div>
                 </dl>
               </section>
             ) : null}
@@ -208,7 +190,8 @@ export function WelcomeWizardPage() {
               <section className="crawl-wizard-section">
                 <h2>Choose what to collect</h2>
                 <p className="hint">
-                  Depth controls how far we follow internal links. Max pages caps cost. Tweak more in Advanced options.
+                  Depth controls how far we follow internal links. Page budget caps queue size and test meter exposure
+                  (1–{ABSOLUTE_MAX_PAGES}).
                 </p>
                 <div className="crawl-scope-row">
                   <label className="field crawl-field-narrow">
@@ -224,7 +207,7 @@ export function WelcomeWizardPage() {
                     />
                   </label>
                   <label className="field crawl-field-narrow">
-                    <span>Max pages</span>
+                    <span>Max pages to crawl</span>
                     <input
                       type="number"
                       min={1}
@@ -233,12 +216,16 @@ export function WelcomeWizardPage() {
                       onChange={(e) =>
                         setAdvanced((a) => ({
                           ...a,
-                          maxPages: Number(e.target.value) || DEFAULT_MAX_PAGES,
+                          maxPages: clampMaxPages(Number(e.target.value)),
                         }))
                       }
+                      aria-describedby="wizard-max-pages-hint"
                     />
                   </label>
                 </div>
+                <p id="wizard-max-pages-hint" className="hint">
+                  Default {DEFAULT_MAX_PAGES}; hard cap {ABSOLUTE_MAX_PAGES}. Sent to the API when you start.
+                </p>
                 <p className="hint">
                   Selector mode <strong>{advanced.selectorMode.toUpperCase()}</strong>
                   {advanced.elementPickGoal
