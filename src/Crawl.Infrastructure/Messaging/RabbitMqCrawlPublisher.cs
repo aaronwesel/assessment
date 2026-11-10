@@ -7,6 +7,10 @@ using RabbitMQ.Client;
 
 namespace Crawl.Infrastructure.Messaging;
 
+/// <summary>
+/// Publishes <see cref="Crawl.Domain.Messaging.CrawlPageRequested"/> after the page row exists in Postgres.
+/// Persistent JSON + deterministic MessageId ({jobId}:{pageId}) aids ops correlation; depth headers feed priority queue.
+/// </summary>
 public sealed class RabbitMqCrawlPublisher(
     RabbitMqConnectionFactory connectionFactory,
     ILogger<RabbitMqCrawlPublisher> logger) : ICrawlMessagePublisher, IDisposable

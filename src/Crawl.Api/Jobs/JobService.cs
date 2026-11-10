@@ -8,6 +8,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Crawl.Api.Jobs;
 
+/// <summary>
+/// HTTP-facing crawl job orchestration: normalize seed URL, persist root page, publish first RabbitMQ message.
+/// Reads are no-tracking; cancel is cooperative (worker checks status before fetch/enqueue children).
+/// </summary>
 public sealed class JobService(
     CrawlDbContext db,
     ICrawlMessagePublisher publisher,

@@ -2,7 +2,7 @@
 
 Graded job-based web crawler: **Crawl.Api** + **Crawl.Worker** + PostgreSQL + RabbitMQ.
 
-Rubric narrative (architecture, idempotency, DLQ, 4h priorities, cloud sketch): [crawl-readme.md](crawl-readme.md).
+Rubric narrative (architecture, idempotency, retries, DLQ, DLR, assessment PDF priorities, cloud sketch): [crawl-readme.md](crawl-readme.md).
 
 ## Run (Compose)
 

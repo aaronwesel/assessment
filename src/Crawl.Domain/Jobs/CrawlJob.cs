@@ -3,6 +3,9 @@ using Crawl.Domain.Pages;
 
 namespace Crawl.Domain.Jobs;
 
+/// <summary>
+/// Crawl job aggregate: seed URL, depth/page caps, lifecycle. <see cref="StartHost"/> anchors Domain Link Ratio.
+/// </summary>
 public class CrawlJob
 {
     public const int UrlMaxLength = 2048;
@@ -63,6 +66,9 @@ public class CrawlJob
         FailureReason = Truncate(reason, FailureReasonMaxLength);
     }
 
+    /// <summary>
+    /// After each page terminal transition: fail job if seed unrunnable; else complete when no Queued/Processing pages remain.
+    /// </summary>
     public void ReconcileAfterPageFinished(CrawlPageStatus rootPageStatus, int queuedOrProcessingCount, DateTimeOffset nowUtc)
     {
         if (Status.IsTerminal())

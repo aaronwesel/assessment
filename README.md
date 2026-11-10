@@ -2,7 +2,7 @@
 
 Job-based **web crawler** (.NET 8 API + Worker · RabbitMQ · Postgres · React) plus HIPAA-minded SaaS prep (FastAPI auth/billing · Terraform ECS sketch).
 
-**Graded path:** [docs/crawl-readme.md](docs/crawl-readme.md) (rubric narrative) · [docs/crawl.md](docs/crawl.md) (API + message details).
+**Graded path:** [docs/crawl-readme.md](docs/crawl-readme.md) — run, architecture, message schema, idempotency, retries, DLQ, Domain Link Ratio, PDF rubric priorities/cuts · [docs/crawl.md](docs/crawl.md) (API + engine details).
 
 ## Monorepo layout
 
@@ -67,7 +67,7 @@ GitHub Actions (`.github/workflows/ci.yml`):
 
 ## Docs
 
-- [Crawl assessment README](docs/crawl-readme.md) — run, architecture, schema, idempotency, DLQ, 4h narrative, cloud sketch
+- [Crawl assessment README](docs/crawl-readme.md) — run, architecture, schema, idempotency, retries/DLQ, DLR, assessment PDF priorities (implemented/cut/next), cloud sketch
 - [Crawl API details](docs/crawl.md) — endpoints, queues, domain notes from the .NET stream
 - [Crawl cloud Terraform notes](infra/terraform/CRAWL_CLOUD.md) — ECS + Amazon MQ + Aurora (**no apply**)
 - [HIPAA engineering checklist](docs/hipaa-checklist.md) — required controls before calling anything complete (not a certification claim)

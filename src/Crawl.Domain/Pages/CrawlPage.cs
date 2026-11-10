@@ -2,6 +2,10 @@ using Crawl.Domain.Links;
 
 namespace Crawl.Domain.Pages;
 
+/// <summary>
+/// One URL in a job graph. Terminal statuses (Done/Failed/Skipped) make redelivered queue messages idempotent no-ops.
+/// <see cref="DomainLinkRatioValue"/> is computed only when Done — never by AI.
+/// </summary>
 public class CrawlPage
 {
     public const int ErrorMaxLength = 500;

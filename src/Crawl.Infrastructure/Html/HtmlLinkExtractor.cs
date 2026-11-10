@@ -3,6 +3,10 @@ using Crawl.Domain.Links;
 
 namespace Crawl.Infrastructure.Html;
 
+/// <summary>
+/// Deterministic HTML &lt;a href&gt; extraction (AngleSharp). Honors &lt;base href&gt;; drops non-http(s) and
+/// duplicate normalized targets. Domain Link Ratio uses only these links — AI must never replace this path.
+/// </summary>
 public sealed class HtmlLinkExtractor
 {
     private readonly HtmlParser _parser = new();

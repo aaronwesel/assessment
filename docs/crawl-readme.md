@@ -104,6 +104,34 @@ At-least-once delivery → handlers must be safe under redelivery and multi-work
 3. Child inserts tolerate unique races between workers.
 4. Cancel: workers check job status before fetch/enqueue; do not schedule children after cancel.
 
+Worker flow: persist page row → publish `CrawlPageRequested` only after save; on consume, skip terminal pages, then fetch → edges → optional child rows → publish children **after** DB commit (`CrawlPageProcessor`).
+
+---
+
+## Domain Link Ratio & crawl rules
+
+**Domain Link Ratio (DLR)** on each completed page:
+
+\[
+\text{DLR} = \frac{\text{http(s) links whose host equals the job start host}}{\text{total http(s) outgoing links on that page}}
+\]
+
+| Rule | Behavior |
+|------|----------|
+| Start host | Fixed at job create from normalized seed URL (`CrawlJob.StartHost`, IDN punycode, lowercased). |
+| Internal vs external | Compare link `IdnHost` to `StartHost` (case-insensitive). |
+| Ignored schemes | `mailto:`, `tel:`, relative non-http, etc. — not counted in numerator or denominator. |
+| Depth | Children enqueued only when `parentDepth < maxDepth` (default **2**). |
+| Page budget | `maxPages` (default **200**) — stop inserting new child rows when budget is exhausted. |
+| Fan-out order | Internal links only become crawl tasks; stable lexicographic URL order within a depth (BFS-aware with RabbitMQ priority). |
+| URL graph | `UrlNormalizer` canonical form + optional sorted query before unique indexes; see [crawl.md](crawl.md#engine-scrapy-inspired-job-crawler). |
+| robots.txt | Default on — Disallow/Allow longest-prefix, optional `Crawl-delay`; fail-open if robots fetch fails. |
+| HTML-only | Non-HTML responses (incl. **PDF** bodies detected by sniff) are **not** parsed for links — marked Skipped/Failed per fetch policy, not expanded. |
+
+**Hard rule:** DLR, normalization, and edge upserts are deterministic .NET — never AI (`Crawl.Domain.Links.DomainLinkRatio`).
+
+Tree API exposes per-node DLR for Done pages; React shows `DLR` on the job tree.
+
 ---
 
 ## Retry / DLQ
@@ -129,29 +157,39 @@ Operator: inspect DLQ in RabbitMQ management UI; replay is deliberate (not auto)
 
 ---
 
-## Four-hour narrative
+## Priorities (assessment PDF rubric)
 
-**Implemented first**
+Maps the home-assignment **implemented first / cut / next** trade-offs from the Technical Assessment PDF (rubric). Same headings reviewers expect in README.
 
-1. Domain tests — UrlNormalizer + Domain Link Ratio  
-2. API + SQL — jobs/pages/edges, create/status/tree/history/cancel/health  
-3. Worker + RabbitMQ — consume, fetch, parse, idempotent upsert, retries/DLQ  
-4. React poll UI — Start / Details / History  
-5. Compose + this README + CI  
+### Implemented first — and why
 
-**Cut if needed**
+| Priority | Why first |
+|----------|-----------|
+| Domain tests — `UrlNormalizer` + **Domain Link Ratio** | Wrong graph math invalidates the whole demo; cheap to test; blocks API/UI lies about ratios. |
+| API + Postgres — jobs/pages/edges, create/status/tree/history/cancel/health | Contract the UI and worker share; persistence proves idempotent schema before broker load. |
+| Worker + RabbitMQ — consume, fetch, parse, upsert, retries/DLQ | Rubric’s async boundary; without at-least-once + DLQ the job model is incomplete. |
+| React poll UI — Start / Details / History | End-to-end proof for reviewers; polling is enough for a timed crawl. |
+| Docker Compose + this README + CI | One-command repro + gates on `dotnet test` / docker builds — submission hygiene. |
 
-- SignalR / SSE live push  
-- Full Terraform **apply** / real AWS cutover  
-- Salesforce live webhook, Rekognition screenshots  
-- Strong SSRF allowlist (robots / politeness shipped in worker) 
+### Cut if needed — and why
 
-**Next**
+| Cut | Why it was deferrable |
+|-----|------------------------|
+| SignalR / SSE live push | Polling + 200-page cap is acceptable for assessment; push adds broker/UI coupling for little rubric credit. |
+| `terraform apply` / live AWS cutover | **Forbidden** in prep/CI anyway; sketches (`CRAWL_CLOUD.md`, modules) document scale without account risk. |
+| Salesforce live webhook, Rekognition screenshots | Role “much more” — interfaces/outbox stubs OK; live CRM/OCR needs creds and ops time. |
+| Strong SSRF allowlist | Known production gap; robots + politeness + redirect limits shipped first for crawl correctness. |
+| PDF / document link extraction | HTML-only rubric; sniff rejects `%PDF` bodies (see tests) — parsing PDFs is a different product surface. |
 
-- Payer portal / clearinghouse adapter stubs wired to field-finder  
-- X12/FHIR as documented integration path (not weekend EDI engine)  
-- Worker autoscaling on Amazon MQ depth + alarms  
-- Vault-backed assisted login with full audit  
+### Next with more time
+
+| Next | Why later |
+|------|-----------|
+| Payer portal / clearinghouse adapters + field-finder | Shows RCM fit once crawl graph is trustworthy. |
+| X12/FHIR integration path (not a weekend EDI engine) | Honest senior scope — document contracts, don’t fake claims adjudication. |
+| Worker autoscaling on Amazon MQ depth + alarms | Needs real AWS + metrics; local Compose proves consumer logic. |
+| Vault-backed assisted login + full audit | Security-sensitive; must not block graded HTML crawl. |
+| SSRF allowlist + optional JS render / PDF text extract | Production hardening beyond timed HTML depth crawl. |
 
 ---
 
