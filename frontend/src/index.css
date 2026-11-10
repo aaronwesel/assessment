@@ -911,6 +911,28 @@ code {
   font-size: 1.02rem;
 }
 
+.crawl-welcome-greeting {
+  margin: 0 0 1.25rem;
+  padding: 0.75rem 1rem;
+  max-width: 42rem;
+  font-size: 0.98rem;
+  line-height: 1.45;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--primary) 9%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--primary) 22%, var(--line));
+  border-radius: 10px;
+}
+
+.crawl-welcome-greeting em {
+  font-style: normal;
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.crawl-welcome-greeting--loading {
+  color: var(--muted);
+}
+
 .crawl-console-actions,
 .crawl-console-actions-row {
   display: flex;
