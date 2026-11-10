@@ -20,11 +20,14 @@ public class IncidentMonitorTests
     public async Task Monitor_applies_backoff_for_rate_limit_without_model()
     {
         await using var db = CreateDb();
-        var politeness = new HostPolitenessGate(OptionsFactory.Create(new CrawlHttpOptions
-        {
-            PolitenessDelayMilliseconds = 100,
-            MaxPolitenessMultiplier = 16
-        }));
+        var politeness = new HostPolitenessGate(
+            OptionsFactory.Create(new CrawlHttpOptions
+            {
+                PolitenessDelayMilliseconds = 100,
+                MaxPolitenessMultiplier = 16,
+                DistributedHostPoliteness = false
+            }),
+            NullLogger<HostPolitenessGate>.Instance);
         var egress = new ConfigListEgressProxyProvider(
             new OptionsMonitorStub<CrawlEgressOptions>(new CrawlEgressOptions { Enabled = true, Proxies = [] }),
             NullLogger<ConfigListEgressProxyProvider>.Instance);
@@ -56,7 +59,9 @@ public class IncidentMonitorTests
     public async Task Proxy_remediation_fails_closed_without_proxies()
     {
         await using var db = CreateDb();
-        var politeness = new HostPolitenessGate(OptionsFactory.Create(new CrawlHttpOptions()));
+        var politeness = new HostPolitenessGate(
+            OptionsFactory.Create(new CrawlHttpOptions { DistributedHostPoliteness = false }),
+            NullLogger<HostPolitenessGate>.Instance);
         var egress = new ConfigListEgressProxyProvider(
             new OptionsMonitorStub<CrawlEgressOptions>(new CrawlEgressOptions { Enabled = true, Proxies = [] }),
             NullLogger<ConfigListEgressProxyProvider>.Instance);

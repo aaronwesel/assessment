@@ -59,6 +59,7 @@ resource "aws_ecs_task_definition" "crawl_api" {
         retries     = 3
         startPeriod = 60
       }
+      # SignalR hub: /hubs/crawl-jobs (ALB sticky sessions recommended for multi-API).
     }
   ])
 
@@ -99,6 +100,18 @@ resource "aws_ecs_task_definition" "crawl_worker" {
           awslogs-stream-prefix = "crawl-worker"
         }
       }
+      # Competing consumers on crawl.page; health + /ops/queue for scale signals.
+      healthCheck = {
+        command     = ["CMD-SHELL", "curl -fsS http://127.0.0.1:8081/health || exit 1"]
+        interval    = 30
+        timeout     = 5
+        retries     = 3
+        startPeriod = 60
+      }
+      portMappings = [{
+        containerPort = 8081
+        protocol      = "tcp"
+      }]
     }
   ])
 

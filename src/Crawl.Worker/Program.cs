@@ -66,11 +66,30 @@ try
     using (var scope = app.Services.CreateScope())
     {
         var db = scope.ServiceProvider.GetRequiredService<CrawlDbContext>();
-        await db.Database.MigrateAsync();
+        var migrateLog = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("CrawlDbMigrator");
+        await CrawlDbMigrator.MigrateSafeAsync(db, migrateLog);
     }
 
     app.MapHealthChecks("/health");
     app.MapGet("/", () => Results.Ok(new { service = "Crawl.Worker", status = "ok" }));
+
+    // Scale signal for local demos / operator probes (same shape as API /api/ops/queue).
+    app.MapGet("/ops/queue", (RabbitMqQueueStats stats) =>
+    {
+        var snap = stats.ReadPageQueue();
+        return Results.Ok(new
+        {
+            service = "Crawl.Worker",
+            queue = snap.Queue,
+            messagesReady = snap.MessagesReady,
+            consumerCount = snap.ConsumerCount,
+            dlqMessages = snap.DlqMessages,
+            suggestScaleOut = snap.SuggestScaleOut(),
+            suggestScaleIn = snap.SuggestScaleIn(),
+            healthy = snap.Healthy,
+            atUtc = snap.AtUtc
+        });
+    });
 
     await app.RunAsync();
 }

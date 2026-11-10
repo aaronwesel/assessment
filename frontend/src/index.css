@@ -14,6 +14,8 @@
   --accent: #4d9fff;
   --accent-glow: color-mix(in srgb, var(--accent) 45%, transparent);
   --danger: #ff8a8a;
+  --success: #00e5b8;
+  --warn: #e6c35c;
   --radius: 10px;
   --font: "IBM Plex Sans", "Segoe UI", sans-serif;
   --display: "DM Serif Display", Georgia, serif;
@@ -893,6 +895,26 @@ code {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--primary);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.crawl-brand-mark {
+  display: block;
+  border-radius: 5px;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 25%, transparent);
+  animation: crawl-rise 0.7s ease-out both;
+}
+
+.crawl-job-id {
+  font-size: 0.82rem;
+  word-break: break-all;
+}
+
+.crawl-poll-hint.is-signalr {
+  color: var(--success);
   font-weight: 600;
 }
 

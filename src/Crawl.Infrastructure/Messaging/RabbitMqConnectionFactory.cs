@@ -76,6 +76,13 @@ public sealed class RabbitMqConnectionFactory(IOptions<RabbitMqOptions> options)
             exclusive: false,
             autoDelete: false,
             arguments: args);
+
+        // Progress fanout: workers publish; each API instance binds an exclusive queue for SignalR relay.
+        channel.ExchangeDeclare(
+            _options.ProgressExchange,
+            ExchangeType.Fanout,
+            durable: true,
+            autoDelete: false);
     }
 
     public void Dispose()

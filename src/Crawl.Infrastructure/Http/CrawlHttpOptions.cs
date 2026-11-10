@@ -34,4 +34,10 @@ public sealed class CrawlHttpOptions
 
     /// <summary>Sort query parameters during URL normalization for stronger dedup.</summary>
     public bool SortQueryParameters { get; set; } = true;
+
+    /// <summary>
+    /// When true, take a Postgres advisory lock per host so concurrent workers share politeness.
+    /// Falls back to process-local spacing if the lock cannot be acquired.
+    /// </summary>
+    public bool DistributedHostPoliteness { get; set; } = true;
 }
