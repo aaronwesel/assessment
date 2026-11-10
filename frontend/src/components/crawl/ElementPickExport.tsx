@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react'
 import type { PageNode } from '../../api/crawl'
 import { suggestFields, type FieldSuggestion } from '../../crawl/ai/crawlAiApi'
 import { flattenPageNodes } from '../../crawl/jobReport'
+import { loadAdvancedFromStorage } from './crawlAdvancedOptions'
 
 type Props = {
   jobId: string
@@ -13,15 +14,23 @@ type Props = {
 
 type PickFormat = 'css' | 'xpath' | 'both'
 
+function pickFormatFromPrefs(): PickFormat {
+  const prefs = loadAdvancedFromStorage()
+  return prefs.selectorMode === 'xpath' ? 'xpath' : 'css'
+}
+
 export function ElementPickExport({ jobId, root }: Props) {
   const pages = useMemo(() => flattenPageNodes(root), [root])
   const [pageId, setPageId] = useState<number | ''>(pages[0]?.pageId ?? '')
   const selected = pages.find((p) => p.pageId === pageId)
   const [html, setHtml] = useState('')
-  const [goal, setGoal] = useState('tables, eligibility, claim ids')
+  const [goal, setGoal] = useState(() => {
+    const prefs = loadAdvancedFromStorage()
+    return prefs.elementPickGoal.trim() || 'tables, eligibility, claim ids'
+  })
   const [suggestions, setSuggestions] = useState<FieldSuggestion[]>([])
   const [picked, setPicked] = useState<Set<string>>(new Set())
-  const [format, setFormat] = useState<PickFormat>('both')
+  const [format, setFormat] = useState<PickFormat>(() => pickFormatFromPrefs())
   const [note, setNote] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 

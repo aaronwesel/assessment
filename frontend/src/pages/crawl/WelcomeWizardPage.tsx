@@ -56,6 +56,7 @@ export function WelcomeWizardPage() {
     void fetchCrawlPricing().then(setPricing)
   }, [])
 
+  // URL query seeds step/drawer once; do not re-apply when advanced prefs change.
   useEffect(() => {
     if (params.get('retry') === 'login') setStep(0)
     const stepParam = params.get('step')
@@ -64,19 +65,38 @@ export function WelcomeWizardPage() {
       if (!Number.isNaN(n)) setStep(Math.min(3, Math.max(0, n)))
     }
     if (params.get('advanced') === '1') setDrawerOpen(true)
+  }, [params])
+
+  useEffect(() => {
     saveAdvancedToStorage(advanced)
-  }, [params, advanced])
+  }, [advanced])
 
   const goNext = () => {
-    if (step === 0 && urlInput.trim() && !urlLooksValid) {
-      const coerced = coerceUrl(urlInput)
-      if (coerced !== urlInput) {
-        setUrlInput(coerced)
-        setSoftNote('We added https:// for you — click Continue when the address looks right.')
+    if (step === 0) {
+      if (!urlInput.trim()) {
+        setSoftNote('Paste a site like books.toscrape.com — we will add https:// if needed.')
         return
       }
-      setSoftNote('Try a host with a dot, like example.com or https://books.toscrape.com')
-      return
+      if (!urlLooksValid) {
+        const coerced = coerceUrl(urlInput)
+        if (coerced !== urlInput) {
+          setUrlInput(coerced)
+          try {
+            const parsed = new URL(coerced)
+            if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+              setSoftNote(null)
+              setStep(1)
+              return
+            }
+          } catch {
+            /* fall through */
+          }
+          setSoftNote('We added https:// for you — click Continue when the address looks right.')
+          return
+        }
+        setSoftNote('Try a host with a dot, like example.com or https://books.toscrape.com')
+        return
+      }
     }
     setSoftNote(null)
     setStep((s) => Math.min(s + 1, 3))
@@ -84,6 +104,11 @@ export function WelcomeWizardPage() {
 
   async function submit(event: FormEvent) {
     event.preventDefault()
+    // Enter in early steps advances the wizard — never skip straight to Start crawl.
+    if (step < 3) {
+      goNext()
+      return
+    }
     if (!urlLooksValid) {
       setSoftNote('We need a reachable https address — we can fix missing https:// automatically.')
       setStep(0)
