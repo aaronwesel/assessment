@@ -30,8 +30,8 @@ public sealed class JobService(
         if (maxDepth is < 0 or > CrawlJob.AbsoluteMaxDepth)
             return (null, $"maxDepth must be between 0 and {CrawlJob.AbsoluteMaxDepth}.");
 
-        if (maxPages is < 1 or > CrawlJob.DefaultMaxPages)
-            return (null, $"maxPages must be between 1 and {CrawlJob.DefaultMaxPages}.");
+        if (maxPages is < 1 or > CrawlJob.AbsoluteMaxPages)
+            return (null, $"maxPages must be between 1 and {CrawlJob.AbsoluteMaxPages}.");
 
         var now = DateTimeOffset.UtcNow;
         var job = CrawlJob.Create(normalized, maxDepth, maxPages, now);
