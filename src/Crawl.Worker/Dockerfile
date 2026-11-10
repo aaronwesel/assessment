@@ -5,10 +5,12 @@ WORKDIR /src
 COPY Crawl.sln ./
 COPY src/Crawl.Domain/Crawl.Domain.csproj src/Crawl.Domain/
 COPY src/Crawl.Infrastructure/Crawl.Infrastructure.csproj src/Crawl.Infrastructure/
+COPY src/Crawl.Ai/Crawl.Ai.csproj src/Crawl.Ai/
 COPY src/Crawl.Worker/Crawl.Worker.csproj src/Crawl.Worker/
 RUN dotnet restore src/Crawl.Worker/Crawl.Worker.csproj
 COPY src/Crawl.Domain/ src/Crawl.Domain/
 COPY src/Crawl.Infrastructure/ src/Crawl.Infrastructure/
+COPY src/Crawl.Ai/ src/Crawl.Ai/
 COPY src/Crawl.Worker/ src/Crawl.Worker/
 RUN dotnet publish src/Crawl.Worker/Crawl.Worker.csproj -c Release -o /app/publish /p:UseAppHost=false
 
