@@ -1,3 +1,5 @@
+# Crawl.Worker — multi-stage image for local Compose and (later) ECR → ECS.
+# Secrets come from env / task role, never baked into layers.
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 COPY Crawl.sln ./
@@ -15,9 +17,9 @@ WORKDIR /app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
-ENV ASPNETCORE_URLS=http://+:8081
+ENV ASPNETCORE_URLS=http://+:8081 \
+    DOTNET_EnableDiagnostics=0
 EXPOSE 8081
 COPY --from=build /app/publish .
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Crawl.Worker.dll"]
-

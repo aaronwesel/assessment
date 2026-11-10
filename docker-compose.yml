@@ -1,7 +1,6 @@
-# Local stack parity with the AWS shape (ECS API + RDS + ElastiCache + SPA).
-# API builds from backend/; frontend remains a stub until its Dockerfile lands.
-# Redis here backs JWT session keys / blacklist the same way ElastiCache will.
-# No secrets committed — copy .env.example → .env for JWT, OAuth, and SES flags.
+# Local stack: platform FastAPI + Crawl (.NET API/Worker) + shared data plane.
+# Crawl shape mirrors cloud: ECS + Aurora Postgres + Amazon MQ (RabbitMQ) + SPA.
+# No secrets committed — copy .env.example → .env.
 
 services:
   db:
@@ -15,6 +14,8 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      # Optional second DB `crawl` (appsettings default). Compose defaults still use `app`.
+      - ./docker/postgres-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-app} -d ${POSTGRES_DB:-app}"]
       interval: 5s
@@ -32,6 +33,37 @@ services:
       timeout: 3s
       retries: 10
 
+  # Local stand-in for Amazon MQ (RabbitMQ engine).
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    restart: unless-stopped
+    hostname: rabbitmq
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  # Optional OTLP sink (debug exporter). Enable: docker compose --profile otel up
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.114.0
+    profiles: ["otel"]
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./infra/otel/otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "${OTEL_COLLECTOR_GRPC_PORT:-4317}:4317"
+      - "${OTEL_COLLECTOR_HTTP_PORT:-4318}:4318"
+
+  # Platform A (prep FastAPI) — differentiator alongside the graded crawl path.
   api:
     build:
       context: ./backend
@@ -48,7 +80,6 @@ services:
       JWT_SECRET: ${JWT_SECRET:-replace-with-local-secret}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-15}
       REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
-      # Alias pairs: Settings accepts GOOGLE_* or GOOGLE_OAUTH_* (same for Microsoft).
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
@@ -89,36 +120,7 @@ services:
       retries: 10
       start_period: 15s
 
-  # Stub until frontend/Dockerfile exists. Replace build/image when UI lands.
-  # http-echo is scratch-based (no shell); health is port reachability / HTTP GET.
-  frontend:
-    image: hashicorp/http-echo:1.0
-    command: ["-text=frontend-stub-ok", "-listen=:3000"]
-    restart: unless-stopped
-    ports:
-      - "${FRONTEND_PORT:-3000}:3000"
-    environment:
-      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
-      VITE_CRAWL_API_URL: ${VITE_CRAWL_API_URL:-http://localhost:8080}
-    depends_on:
-      api:
-        condition: service_healthy
-
-  rabbitmq:
-    image: rabbitmq:3.13-management-alpine
-    restart: unless-stopped
-    ports:
-      - "${RABBITMQ_PORT:-5672}:5672"
-      - "${RABBITMQ_UI_PORT:-15672}:15672"
-    environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 12
-
+  # Crawl.Api (.NET 8) — create / status / tree / history / cancel / health (+ assistive AI).
   crawl-api:
     build:
       context: .
@@ -129,28 +131,34 @@ services:
       - "${CRAWL_API_PORT:-8080}:8080"
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ASPNETCORE_URLS: http://+:8080
+      # Same Postgres instance as platform; crawl_* tables (see docs/crawl.md). Override to Database=crawl if desired.
       ConnectionStrings__Crawl: ${CRAWL_DATABASE_URL:-Host=db;Port=5432;Database=${POSTGRES_DB:-app};Username=${POSTGRES_USER:-app};Password=${POSTGRES_PASSWORD:-changeme-local-only}}
       RabbitMq__HostName: rabbitmq
-      RabbitMq__Port: 5672
+      RabbitMq__Port: "5672"
       RabbitMq__UserName: ${RABBITMQ_USER:-guest}
       RabbitMq__Password: ${RABBITMQ_PASSWORD:-guest}
+      RabbitMq__PageQueue: ${CRAWL_QUEUE:-crawl.page}
+      RabbitMq__PageDlq: ${CRAWL_DLQ:-crawl.page.dlq}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      CrawlAi__DeepSeekApiKey: ${DEEPSEEK_API_KEY:-}
+      CrawlAi__Enabled: ${CRAWL_AI_ENABLED:-true}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OTEL_SERVICE_NAME: crawl-api
     depends_on:
       db:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "curl -fsS http://127.0.0.1:8080/health >/dev/null || exit 1",
-        ]
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health"]
       interval: 10s
       timeout: 5s
       retries: 12
-      start_period: 25s
+      start_period: 40s
 
+  # Crawl.Worker (.NET 8) — competing consumers; HTML fetch/parse; idempotent upserts.
+  # Scale: docker compose up --scale crawl-worker=2
   crawl-worker:
     build:
       context: .
@@ -161,12 +169,17 @@ services:
       - "${CRAWL_WORKER_PORT:-8081}:8081"
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ASPNETCORE_URLS: http://+:8081
       ConnectionStrings__Crawl: ${CRAWL_DATABASE_URL:-Host=db;Port=5432;Database=${POSTGRES_DB:-app};Username=${POSTGRES_USER:-app};Password=${POSTGRES_PASSWORD:-changeme-local-only}}
       RabbitMq__HostName: rabbitmq
-      RabbitMq__Port: 5672
+      RabbitMq__Port: "5672"
       RabbitMq__UserName: ${RABBITMQ_USER:-guest}
       RabbitMq__Password: ${RABBITMQ_PASSWORD:-guest}
+      RabbitMq__PageQueue: ${CRAWL_QUEUE:-crawl.page}
+      RabbitMq__PageDlq: ${CRAWL_DLQ:-crawl.page.dlq}
+      CrawlHttp__TimeoutSeconds: ${CRAWL_HTTP_TIMEOUT_SECONDS:-15}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OTEL_SERVICE_NAME: crawl-worker
     depends_on:
       db:
         condition: service_healthy
@@ -175,15 +188,29 @@ services:
       crawl-api:
         condition: service_healthy
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "curl -fsS http://127.0.0.1:8081/health >/dev/null || exit 1",
-        ]
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8081/health"]
       interval: 10s
       timeout: 5s
       retries: 12
-      start_period: 25s
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+        # Browser → host-mapped Crawl.Api. Use http://localhost:5059 for Vite + `dotnet run`.
+        VITE_CRAWL_API_URL: ${VITE_CRAWL_API_URL:-http://localhost:8080}
+    image: assessment-frontend:local
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      crawl-api:
+        condition: service_healthy
+      api:
+        condition: service_healthy
 
 volumes:
   postgres_data:

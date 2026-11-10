@@ -2,10 +2,14 @@
 
 Graded job-based web crawler: **Crawl.Api** + **Crawl.Worker** + PostgreSQL + RabbitMQ.
 
+Rubric narrative (architecture, idempotency, DLQ, 4h priorities, cloud sketch): [crawl-readme.md](crawl-readme.md).
+
 ## Run (Compose)
 
 ```bash
 cp .env.example .env
+docker compose up --build
+# crawl-only subset:
 docker compose up --build db rabbitmq crawl-api crawl-worker
 ```
 
@@ -13,8 +17,10 @@ docker compose up --build db rabbitmq crawl-api crawl-worker
 |---------|-----|
 | Crawl API + Swagger | http://localhost:8080/swagger |
 | Crawl Worker health | http://localhost:8081/health |
+| Frontend | http://localhost:3000 (`/crawl`) |
 | RabbitMQ management | http://localhost:15672 (`guest`/`guest`) |
-| Postgres | same Compose `db` (`crawl_*` tables) |
+| Postgres | same Compose `db` (`crawl_*` tables; optional `crawl` DB via init) |
+| OTEL (optional) | `docker compose --profile otel up` |
 
 ## Run (from source)
 

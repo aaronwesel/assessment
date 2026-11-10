@@ -1,13 +1,13 @@
-# Scaffold CI: lint · test · docker · terraform fmt/validate.
-# No terraform apply. No secrets required for these stubs.
+# CI: platform FastAPI + Crawl .NET + frontend + docker + terraform fmt/validate.
+# No terraform apply. No cloud secrets required.
 
 name: ci
 
 on:
   push:
-    branches: [main, "prep/**"]
+    branches: [main, "prep/**", "feat/**", "cursor/**"]
   pull_request:
-    branches: [main]
+    branches: [main, "prep/**", "feat/**"]
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -19,23 +19,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Backend lint (stub until packages exist)
+      - name: Backend lint (stub until ruff wired)
         run: |
           if [ -f backend/pyproject.toml ] || [ -f backend/requirements.txt ]; then
-            echo "Backend package files present — wire ruff/mypy in a follow-up."
+            echo "Backend package files present — ruff/mypy optional follow-up."
           else
             echo "No backend package yet; lint stub OK."
           fi
-      - name: Frontend lint (stub until package.json exists)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Frontend lint
+        working-directory: frontend
         run: |
-          if [ -f frontend/package.json ]; then
-            echo "Frontend package.json present — wire eslint/tsc in a follow-up."
-          else
-            echo "No frontend package yet; lint stub OK."
-          fi
+          npm ci
+          npm run lint
 
-  test:
-    name: test
+  test-backend:
+    name: test-backend
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -58,6 +61,42 @@ jobs:
           SES_ENABLED: "false"
           LOGIN_ALERT_EMAIL_ENABLED: "false"
 
+  test-dotnet:
+    name: test-dotnet
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Restore
+        run: dotnet restore Crawl.sln
+      - name: Build
+        run: dotnet build Crawl.sln -c Release --no-restore
+      - name: Test
+        run: dotnet test Crawl.sln -c Release --no-build --verbosity normal
+
+  test-frontend:
+    name: test-frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: Typecheck + production build
+        run: npm run build
+        env:
+          VITE_API_BASE_URL: http://localhost:8000
+          VITE_CRAWL_API_URL: http://localhost:8080
+
   docker:
     name: docker
     runs-on: ubuntu-latest
@@ -65,19 +104,19 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate Compose file
         run: docker compose -f docker-compose.yml config --quiet
-      - name: Build Compose API image
+      - name: Build platform API image
         run: docker compose -f docker-compose.yml build api
-      - name: Build frontend image when Dockerfile exists
+      - name: Build Crawl.Api image
+        run: docker compose -f docker-compose.yml build crawl-api
+      - name: Build Crawl.Worker image
+        run: docker compose -f docker-compose.yml build crawl-worker
+      - name: Build frontend image
+        run: docker compose -f docker-compose.yml build frontend
+      - name: Pull data-plane images
         run: |
-          set -euo pipefail
-          if [ -f frontend/Dockerfile ]; then
-            docker compose -f docker-compose.yml build frontend
-          else
-            echo "No frontend/Dockerfile yet; pulling frontend stub + data plane images."
-            docker pull --quiet hashicorp/http-echo:1.0
-            docker pull --quiet postgres:16-alpine
-            docker pull --quiet redis:7-alpine
-          fi
+          docker pull --quiet postgres:16-alpine
+          docker pull --quiet redis:7-alpine
+          docker pull --quiet rabbitmq:3.13-management-alpine
 
   terraform:
     name: terraform
@@ -108,4 +147,4 @@ jobs:
       - name: terraform validate
         if: steps.tf.outputs.present == 'true'
         run: terraform validate
-      # Explicitly never: terraform apply / plan against real cloud from CI in prep.
+      # Explicitly never: terraform apply / plan against real cloud from CI.
