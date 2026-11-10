@@ -25,6 +25,8 @@ export function JobDetailsPage() {
 
   const loadJob = useCallback(async () => {
     if (!jobId) return
+    await Promise.resolve()
+    setLoading(true)
     try {
       const next = await crawlApi.getJob(jobId)
       setJob(next)
@@ -41,7 +43,6 @@ export function JobDetailsPage() {
   }, [jobId])
 
   useEffect(() => {
-    setLoading(true)
     void loadJob()
   }, [loadJob])
 
@@ -187,6 +188,7 @@ function JobTreeSection({ jobId }: { jobId: string }) {
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
+    await Promise.resolve()
     setLoading(true)
     setError(null)
     try {

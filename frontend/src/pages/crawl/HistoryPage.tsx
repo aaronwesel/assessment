@@ -22,6 +22,7 @@ export function HistoryPage() {
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
+    await Promise.resolve()
     setLoading(true)
     setError(null)
     try {
