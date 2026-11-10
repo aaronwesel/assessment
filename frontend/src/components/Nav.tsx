@@ -24,6 +24,9 @@ export function Nav() {
             <Link className="nav-link" to="/app">
               App
             </Link>
+            <Link className="nav-link" to="/billing">
+              Billing
+            </Link>
             {isPlatformAdmin(user?.roles) ? (
               <Link className="nav-link" to="/superadmin">
                 Superadmin

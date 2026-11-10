@@ -17,6 +17,8 @@ HIPAA / safety defaults:
 - DeepSeek, Rekognition, SES, and Slack are OFF unless explicitly enabled.
 - Login-alert recipients are ops mailboxes, not end-user PHI destinations.
 - Slack webhook bodies must stay PHI-free (opaque ids + event codes only).
+- Stripe keys (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`) stay in env /
+  Secrets Manager — never commit live or test secrets.
 """
 
 from functools import lru_cache
@@ -141,6 +143,37 @@ class Settings(BaseSettings):
     slack_enabled: bool = Field(
         default=False,
         validation_alias=AliasChoices("SLACK_ENABLED"),
+    )
+
+    # Stripe Billing (test mode) — secrets via env / Secrets Manager only
+    stripe_secret_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("STRIPE_SECRET_KEY"),
+    )
+    stripe_publishable_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("STRIPE_PUBLISHABLE_KEY"),
+    )
+    stripe_webhook_secret: str = Field(
+        default="",
+        validation_alias=AliasChoices("STRIPE_WEBHOOK_SECRET"),
+    )
+    stripe_price_id: str = Field(
+        default="",
+        validation_alias=AliasChoices("STRIPE_PRICE_ID"),
+    )
+    # Checkout / Portal return URLs (local defaults point at Vite frontend)
+    stripe_checkout_success_url: str = Field(
+        default="http://localhost:5173/billing?checkout=success",
+        validation_alias=AliasChoices("STRIPE_CHECKOUT_SUCCESS_URL"),
+    )
+    stripe_checkout_cancel_url: str = Field(
+        default="http://localhost:5173/billing?checkout=cancel",
+        validation_alias=AliasChoices("STRIPE_CHECKOUT_CANCEL_URL"),
+    )
+    stripe_portal_return_url: str = Field(
+        default="http://localhost:5173/billing",
+        validation_alias=AliasChoices("STRIPE_PORTAL_RETURN_URL"),
     )
 
     @property

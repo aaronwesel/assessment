@@ -2,7 +2,7 @@
  * Top-level router shell.
  *
  * Public: landing `/`, login, register.
- * Authenticated: `/app` home.
+ * Authenticated: `/app` home, `/billing` settings.
  * Admin/superadmin: `/superadmin/*` console.
  */
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
@@ -10,6 +10,7 @@ import { AuthProvider } from './auth/AuthContext'
 import { Nav } from './components/Nav'
 import { RequireAuth } from './components/RequireAuth'
 import { RequireRole } from './components/RequireRole'
+import { BillingSettingsPage } from './pages/billing/BillingSettingsPage'
 import { HomePage } from './pages/HomePage'
 import { LandingPage } from './pages/LandingPage'
 import { LoginPage } from './pages/LoginPage'
@@ -36,6 +37,14 @@ export default function App() {
               element={
                 <RequireAuth>
                   <HomePage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/billing"
+              element={
+                <RequireAuth>
+                  <BillingSettingsPage />
                 </RequireAuth>
               }
             />
