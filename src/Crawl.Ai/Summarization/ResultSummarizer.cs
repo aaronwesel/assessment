@@ -29,7 +29,7 @@ public sealed class ResultSummarizer : IResultSummarizer
 
         if (!_deepSeek.IsConfigured)
         {
-            return local with { UsedModel = false, DegradedReason = "DEEPSEEK_API_KEY not configured; heuristic summary only." };
+            return local with { UsedModel = false, DegradedReason = AiDegradedCopy.OfflineHeuristicSummary };
         }
 
         var system = """

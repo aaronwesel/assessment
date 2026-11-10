@@ -37,7 +37,7 @@ public sealed class AskTheCrawlService : IAskTheCrawlService
             return local with
             {
                 UsedModel = false,
-                DegradedReason = "DEEPSEEK_API_KEY not configured; heuristic answer only."
+                DegradedReason = AiDegradedCopy.OfflineHeuristicAnswer
             };
         }
 

@@ -18,7 +18,7 @@ internal sealed class FakeDeepSeek : IDeepSeekClient
     {
         if (!IsConfigured)
         {
-            return Task.FromResult(new DeepSeekResult(null, false, "DEEPSEEK_API_KEY not configured; using local heuristics."));
+            return Task.FromResult(new DeepSeekResult(null, false, AiDegradedCopy.OfflineHeuristics));
         }
 
         return Task.FromResult(new DeepSeekResult(_content, true, null));

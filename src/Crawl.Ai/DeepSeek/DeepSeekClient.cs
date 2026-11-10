@@ -34,7 +34,7 @@ public sealed class DeepSeekClient : IDeepSeekClient
         var key = ResolveApiKey();
         if (string.IsNullOrWhiteSpace(key))
         {
-            return new DeepSeekResult(null, false, "DEEPSEEK_API_KEY not configured; using local heuristics.");
+            return new DeepSeekResult(null, false, AiDegradedCopy.OfflineHeuristics);
         }
 
         try
@@ -54,7 +54,7 @@ public sealed class DeepSeekClient : IDeepSeekClient
             if (!res.IsSuccessStatusCode)
             {
                 _logger.LogWarning("DeepSeek HTTP {Status}; degrading without model output", (int)res.StatusCode);
-                return new DeepSeekResult(null, false, $"DeepSeek HTTP {(int)res.StatusCode}; using local heuristics.");
+                return new DeepSeekResult(null, false, AiDegradedCopy.HttpFallback((int)res.StatusCode));
             }
 
             await using var stream = await res.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
@@ -63,7 +63,7 @@ public sealed class DeepSeekClient : IDeepSeekClient
             var content = parsed?.Choices?.FirstOrDefault()?.Message?.Content;
             if (string.IsNullOrWhiteSpace(content))
             {
-                return new DeepSeekResult(null, false, "DeepSeek returned empty content; using local heuristics.");
+                return new DeepSeekResult(null, false, AiDegradedCopy.EmptyContent);
             }
 
             return new DeepSeekResult(content, true, null);
@@ -71,19 +71,11 @@ public sealed class DeepSeekClient : IDeepSeekClient
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
         {
             _logger.LogWarning(ex, "DeepSeek call failed; degrading");
-            return new DeepSeekResult(null, false, "DeepSeek unavailable; using local heuristics.");
+            return new DeepSeekResult(null, false, AiDegradedCopy.Unavailable);
         }
     }
 
-    private string? ResolveApiKey()
-    {
-        if (!string.IsNullOrWhiteSpace(_options.DeepSeekApiKey))
-        {
-            return _options.DeepSeekApiKey;
-        }
-
-        return Environment.GetEnvironmentVariable("DEEPSEEK_API_KEY");
-    }
+    private string? ResolveApiKey() => DeepSeekApiKeyResolver.Resolve(_options.DeepSeekApiKey);
 
     private sealed record ChatRequest(
         [property: JsonPropertyName("model")] string Model,
