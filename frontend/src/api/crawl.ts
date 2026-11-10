@@ -32,6 +32,8 @@ export interface CrawlJob {
   failureReason: string | null
   pageCounts: PageCounts
   progressPercent: number
+  alertEmail: string | null
+  statusAlertSent: boolean
 }
 
 export interface PageNode {
@@ -191,5 +193,11 @@ export const crawlApi = {
   cancelJob: (jobId: string) =>
     request<void>(`/api/jobs/${encodeURIComponent(jobId)}/cancel`, {
       method: 'POST',
+    }),
+
+  setJobAlertEmail: (jobId: string, email: string | null) =>
+    request<CrawlJob>(`/api/jobs/${encodeURIComponent(jobId)}/alert-email`, {
+      method: 'PUT',
+      body: JSON.stringify({ email }),
     }),
 }
