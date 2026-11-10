@@ -1,12 +1,17 @@
 /**
- * Start Crawl — polished URL + maxDepth form → Job Details.
+ * Start Crawl — polished URL + maxDepth + maxPages form → Job Details.
  */
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { crawlApi, CrawlApiError } from '../../api/crawl'
 import { CrawlShell } from '../../components/crawl/CrawlShell'
+import {
+  ABSOLUTE_MAX_PAGES,
+  DEFAULT_MAX_PAGES,
+  parseMaxPagesInput,
+} from '../../components/crawl/crawlPageLimits'
 
-type FieldErrors = { url?: string[]; maxDepth?: string[] }
+type FieldErrors = { url?: string[]; maxDepth?: string[]; maxPages?: string[] }
 
 function coerceUrl(input: string): string {
   const trimmed = input.trim()
@@ -16,7 +21,7 @@ function coerceUrl(input: string): string {
   return trimmed
 }
 
-function validate(url: string, maxDepth: string): FieldErrors {
+function validate(url: string, maxDepth: string, maxPages: string): FieldErrors {
   const errors: FieldErrors = {}
   const normalized = coerceUrl(url)
   try {
@@ -30,13 +35,23 @@ function validate(url: string, maxDepth: string): FieldErrors {
   if (maxDepth !== '' && !/^[0-5]$/.test(maxDepth)) {
     errors.maxDepth = ['Max depth must be a whole number between 0 and 5.']
   }
+  if (maxPages !== '') {
+    const parsed = parseMaxPagesInput(maxPages)
+    if (parsed === undefined) {
+      errors.maxPages = [`Max pages must be a whole number between 1 and ${ABSOLUTE_MAX_PAGES}.`]
+    }
+  }
   return errors
 }
 
 function serverFieldErrors(error: unknown): FieldErrors | undefined {
   if (!(error instanceof CrawlApiError) || !error.problem.errors) return undefined
-  const { Url, MaxDepth, url, maxDepth } = error.problem.errors
-  return { url: Url ?? url, maxDepth: MaxDepth ?? maxDepth }
+  const { Url, MaxDepth, MaxPages, url, maxDepth, maxPages } = error.problem.errors
+  return {
+    url: Url ?? url,
+    maxDepth: MaxDepth ?? maxDepth,
+    maxPages: MaxPages ?? maxPages,
+  }
 }
 
 export function StartCrawlPage() {
@@ -45,6 +60,7 @@ export function StartCrawlPage() {
   const formId = useId()
   const [url, setUrl] = useState('')
   const [maxDepth, setMaxDepth] = useState('')
+  const [maxPages, setMaxPages] = useState(String(DEFAULT_MAX_PAGES))
   const [clientErrors, setClientErrors] = useState<FieldErrors>({})
   const [submitError, setSubmitError] = useState<unknown>(null)
   const [pending, setPending] = useState(false)
@@ -52,6 +68,7 @@ export function StartCrawlPage() {
   const serverErrors = serverFieldErrors(submitError)
   const urlErrors = clientErrors.url ?? serverErrors?.url
   const maxDepthErrors = clientErrors.maxDepth ?? serverErrors?.maxDepth
+  const maxPagesErrors = clientErrors.maxPages ?? serverErrors?.maxPages
 
   useEffect(() => {
     urlRef.current?.focus()
@@ -60,10 +77,10 @@ export function StartCrawlPage() {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const trimmedUrl = coerceUrl(url)
-    const errors = validate(trimmedUrl, maxDepth)
+    const errors = validate(trimmedUrl, maxDepth, maxPages)
     setClientErrors(errors)
     setSubmitError(null)
-    if (errors.url || errors.maxDepth) {
+    if (errors.url || errors.maxDepth || errors.maxPages) {
       urlRef.current?.focus()
       return
     }
@@ -73,6 +90,7 @@ export function StartCrawlPage() {
       const { jobId } = await crawlApi.createJob({
         url: trimmedUrl,
         maxDepth: maxDepth === '' ? undefined : Number(maxDepth),
+        maxPages: parseMaxPagesInput(maxPages),
       })
       navigate(`/crawl/jobs/${jobId}`)
     } catch (err) {
@@ -91,7 +109,7 @@ export function StartCrawlPage() {
   return (
     <CrawlShell
       title="Start a crawl"
-      lede="Point the worker at a start URL. It walks internal links, tracks progress live, and reports Domain Link Ratio when the job finishes."
+      lede="Point the worker at a start URL. Choose depth and page budget before queueing — both are sent to the crawl API."
       actions={
         <>
           <Link className="btn btn-ghost" to="/crawl/welcome">
@@ -139,7 +157,7 @@ export function StartCrawlPage() {
             </p>
           ) : null}
 
-          <div className="crawl-start-row">
+          <div className="crawl-start-row crawl-scope-row">
             <label className="field crawl-field crawl-field-narrow" htmlFor="crawl-max-depth">
               <span>Max depth</span>
               <input
@@ -161,13 +179,38 @@ export function StartCrawlPage() {
                 }
               />
             </label>
-            <p id="crawl-max-depth-hint" className="hint crawl-field-hint">
-              Optional · 0–5 · empty uses server default (2). Esc clears.
-            </p>
+            <label className="field crawl-field crawl-field-narrow" htmlFor="crawl-max-pages">
+              <span>Max pages to crawl</span>
+              <input
+                id="crawl-max-pages"
+                name="maxPages"
+                type="number"
+                min={1}
+                max={ABSOLUTE_MAX_PAGES}
+                step={1}
+                value={maxPages}
+                onChange={(event) => setMaxPages(event.target.value)}
+                aria-invalid={!!maxPagesErrors}
+                aria-describedby={
+                  maxPagesErrors ? 'crawl-max-pages-hint crawl-max-pages-error' : 'crawl-max-pages-hint'
+                }
+              />
+            </label>
           </div>
+          <p id="crawl-max-depth-hint" className="hint">
+            Depth 0–5 · empty depth uses server default (2). Esc clears depth.
+          </p>
+          <p id="crawl-max-pages-hint" className="hint">
+            Page budget 1–{ABSOLUTE_MAX_PAGES} (default {DEFAULT_MAX_PAGES}). Hard stop when the queue hits this cap.
+          </p>
           {maxDepthErrors ? (
             <p id="crawl-max-depth-error" className="form-error">
               {maxDepthErrors.join(' ')}
+            </p>
+          ) : null}
+          {maxPagesErrors ? (
+            <p id="crawl-max-pages-error" className="form-error">
+              {maxPagesErrors.join(' ')}
             </p>
           ) : null}
 
@@ -194,7 +237,7 @@ export function StartCrawlPage() {
         <ol className="crawl-steps">
           <li>
             <strong>Queue</strong>
-            <span>Job is accepted and the root page is enqueued.</span>
+            <span>Job is accepted with your page budget and the root page is enqueued.</span>
           </li>
           <li>
             <strong>Crawl</strong>

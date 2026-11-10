@@ -1,6 +1,8 @@
 /**
  * Wizard-only advanced options (API accepts depth + maxPages; rest are operator notes / UI prefs).
  */
+import { DEFAULT_MAX_PAGES, clampMaxPages } from './crawlPageLimits'
+
 export type SelectorMode = 'css' | 'xpath'
 
 export type CrawlAdvancedOptions = {
@@ -15,7 +17,7 @@ export type CrawlAdvancedOptions = {
 
 export const DEFAULT_ADVANCED: CrawlAdvancedOptions = {
   maxDepth: 2,
-  maxPages: 200,
+  maxPages: DEFAULT_MAX_PAGES,
   politenessNote: 'Default worker delay (~1s/host) — increase if the site rate-limits you.',
   honorRobots: true,
   credentialVaultRef: '',
@@ -29,7 +31,9 @@ export function loadAdvancedFromStorage(): CrawlAdvancedOptions {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY)
     if (!raw) return { ...DEFAULT_ADVANCED }
-    return { ...DEFAULT_ADVANCED, ...(JSON.parse(raw) as Partial<CrawlAdvancedOptions>) }
+    const merged = { ...DEFAULT_ADVANCED, ...(JSON.parse(raw) as Partial<CrawlAdvancedOptions>) }
+    merged.maxPages = clampMaxPages(merged.maxPages)
+    return merged
   } catch {
     return { ...DEFAULT_ADVANCED }
   }
@@ -44,7 +48,7 @@ export function parseAdvancedFromSearch(params: URLSearchParams): Partial<CrawlA
   const depth = params.get('depth')
   if (depth) next.maxDepth = Number(depth)
   const pages = params.get('maxPages')
-  if (pages) next.maxPages = Number(pages)
+  if (pages) next.maxPages = clampMaxPages(Number(pages))
   const sel = params.get('selectorMode')
   if (sel === 'css' || sel === 'xpath') next.selectorMode = sel
   if (params.get('advanced') === '1') {

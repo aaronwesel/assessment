@@ -122,7 +122,7 @@ Worker flow: persist page row → publish `CrawlPageRequested` only after save; 
 | Internal vs external | Compare link `IdnHost` to `StartHost` (case-insensitive). |
 | Ignored schemes | `mailto:`, `tel:`, relative non-http, etc. — not counted in numerator or denominator. |
 | Depth | Children enqueued only when `parentDepth < maxDepth` (default **2**). |
-| Page budget | `maxPages` (default **200**) — stop inserting new child rows when budget is exhausted. |
+| Page budget | `maxPages` (default **200**, cap **5000**) — stop inserting new child rows when budget is exhausted. |
 | Fan-out order | Internal links only become crawl tasks; stable lexicographic URL order within a depth (BFS-aware with RabbitMQ priority). |
 | URL graph | `UrlNormalizer` canonical form + optional sorted query before unique indexes; see [crawl.md](crawl.md#engine-scrapy-inspired-job-crawler). |
 | robots.txt | Default on — Disallow/Allow longest-prefix, optional `Crawl-delay`; fail-open if robots fetch fails. |

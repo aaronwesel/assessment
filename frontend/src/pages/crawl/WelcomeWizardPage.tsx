@@ -17,6 +17,11 @@ import {
   saveAdvancedToStorage,
   type CrawlAdvancedOptions,
 } from '../../components/crawl/crawlAdvancedOptions'
+import {
+  ABSOLUTE_MAX_PAGES,
+  DEFAULT_MAX_PAGES,
+  clampMaxPages,
+} from '../../components/crawl/crawlPageLimits'
 
 function coerceUrl(input: string): string {
   const trimmed = input.trim()
@@ -173,6 +178,10 @@ export function WelcomeWizardPage() {
                     <dt>Planned depth</dt>
                     <dd>{advanced.maxDepth}</dd>
                   </div>
+                  <div>
+                    <dt>Page budget</dt>
+                    <dd>up to {advanced.maxPages} pages (max {ABSOLUTE_MAX_PAGES})</dd>
+                  </div>
                 </dl>
               </section>
             ) : null}
@@ -181,7 +190,8 @@ export function WelcomeWizardPage() {
               <section className="crawl-wizard-section">
                 <h2>Choose what to collect</h2>
                 <p className="hint">
-                  Depth controls how far we follow internal links. Max pages caps cost. Tweak more in Advanced options.
+                  Depth controls how far we follow internal links. Page budget caps queue size and test meter exposure
+                  (1–{ABSOLUTE_MAX_PAGES}).
                 </p>
                 <div className="crawl-scope-row">
                   <label className="field crawl-field-narrow">
@@ -197,18 +207,25 @@ export function WelcomeWizardPage() {
                     />
                   </label>
                   <label className="field crawl-field-narrow">
-                    <span>Max pages</span>
+                    <span>Max pages to crawl</span>
                     <input
                       type="number"
                       min={1}
-                      max={200}
+                      max={ABSOLUTE_MAX_PAGES}
                       value={advanced.maxPages}
                       onChange={(e) =>
-                        setAdvanced((a) => ({ ...a, maxPages: Number(e.target.value) || 200 }))
+                        setAdvanced((a) => ({
+                          ...a,
+                          maxPages: clampMaxPages(Number(e.target.value)),
+                        }))
                       }
+                      aria-describedby="wizard-max-pages-hint"
                     />
                   </label>
                 </div>
+                <p id="wizard-max-pages-hint" className="hint">
+                  Default {DEFAULT_MAX_PAGES}; hard cap {ABSOLUTE_MAX_PAGES}. Sent to the API when you start.
+                </p>
                 <p className="hint">
                   Selector mode <strong>{advanced.selectorMode.toUpperCase()}</strong>
                   {advanced.elementPickGoal
