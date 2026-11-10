@@ -2,7 +2,7 @@
  * Public login page: Google One Tap, Microsoft MSAL, and password form.
  * Already-authenticated users are redirected home.
  */
-import { Navigate } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { GoogleOneTap } from '../components/GoogleOneTap'
 import { MicrosoftSignIn } from '../components/MicrosoftSignIn'
@@ -12,13 +12,16 @@ export function LoginPage() {
   const { isAuthenticated } = useAuth()
 
   if (isAuthenticated) {
-    return <Navigate to="/" replace />
+    return <Navigate to="/app" replace />
   }
 
   return (
     <main className="page login-page">
       <h1>Sign in</h1>
-      <p className="lede">Use Google, Microsoft, or email and password.</p>
+      <p className="lede">
+        Use Google, Microsoft, or email and password. New here?{' '}
+        <Link to="/register">Create an account</Link>.
+      </p>
 
       <div className="auth-stack">
         <GoogleOneTap />

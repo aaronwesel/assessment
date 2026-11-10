@@ -34,11 +34,16 @@ engine = create_engine(_settings.database_url, **_engine_kwargs)
 
 def init_db() -> None:
     """Create tables for local/test when migrations have not run yet."""
-    # Import models so metadata is populated.
+    # Import models so metadata is populated (billing + platform-ops tables).
+    from app.audit import models as _audit  # noqa: F401
+    from app.billing import models as _billing_models  # noqa: F401
+    from app.break_glass import models as _break_glass  # noqa: F401
+    from app.consent import models as _consent  # noqa: F401
     from app.models import account_link as _account_link  # noqa: F401
     from app.models import organization as _organization  # noqa: F401
     from app.models import team as _team  # noqa: F401
     from app.models import user as _user  # noqa: F401
+    from app.webhooks import models as _webhooks  # noqa: F401
 
     SQLModel.metadata.create_all(engine)
 

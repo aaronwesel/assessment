@@ -18,10 +18,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
-from app.api.routes import health
 from app.core.config import get_settings
 from app.core.logging import get_logger, log_event
 from app.core.redis import get_redis
+from app.health.router import router as health_router
 from app.middleware.rate_limit import RateLimitMiddleware
 from app.middleware.request_id import RequestIdMiddleware
 from app.middleware.security_headers import SecurityHeadersMiddleware
@@ -43,6 +43,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         microsoft_configured=settings.microsoft_configured,
         ses_enabled=settings.ses_enabled,
         slack_enabled=settings.slack_enabled,
+        webhooks_enabled=settings.webhooks_enabled,
     )
     # Eager connect so readiness reflects Redis early; falls back to stub if down.
     get_redis()
@@ -77,8 +78,8 @@ def create_app() -> FastAPI:
     application.add_middleware(SecurityHeadersMiddleware)
     application.add_middleware(RateLimitMiddleware)
     application.add_middleware(RequestIdMiddleware)
-    # Root health for ALB/ECS probes (/health liveness, /health/ready deps).
-    application.include_router(health.router)
+    # Root health for ALB/ECS probes (/health liveness, /ready + /health/ready deps).
+    application.include_router(health_router)
     application.include_router(api_router, prefix=settings.api_v1_prefix)
     return application
 

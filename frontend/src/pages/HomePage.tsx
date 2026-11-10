@@ -1,9 +1,12 @@
+import { Link } from 'react-router-dom'
 import { MfaPanel } from '../components/MfaPanel'
 import { useAuth } from '../auth/AuthContext'
 
 /** Authenticated home — shows identity from /auth/me; MFA enroll/verify stub. */
 export function HomePage() {
   const { user } = useAuth()
+  const isAdmin =
+    user?.roles?.includes('admin') || user?.roles?.includes('superadmin')
 
   return (
     <main className="page home-page">
@@ -22,6 +25,11 @@ export function HomePage() {
           <dd>{user?.roles?.join(', ') || '—'}</dd>
         </div>
       </dl>
+      {isAdmin ? (
+        <p className="hint">
+          Platform admin: open the <Link to="/superadmin">superadmin console</Link>.
+        </p>
+      ) : null}
       <MfaPanel />
       <p className="hint">Product screens land after the assessment prompt.</p>
     </main>

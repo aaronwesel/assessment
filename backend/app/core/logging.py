@@ -53,6 +53,11 @@ _SENSITIVE_KEYS = frozenset(
         "field_encryption_key",
         "fernet_key",
         "cookie",
+        # Stripe — never log secret/restricted keys or webhook signing secrets.
+        "stripe_secret_key",
+        "stripe_webhook_secret",
+        "stripe_publishable_key",
+        "webhook_secret",
     }
 )
 

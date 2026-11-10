@@ -41,6 +41,11 @@ Cleartext HTTP to the emulator host is allowed only for debug via `network_secur
 
 Do not ship with real client IDs or secrets in source; inject via `local.properties` or CI secrets when OAuth apps exist.
 
+## Push stub (FCM)
+
+`push/PushConfig.kt` holds FCM project/sender placeholders (no secrets).  
+`push/AlertReceivedHandler.kt` is the single “alert received” path — call it from a future `FirebaseMessagingService` (or debug UI) with an opaque alert id. Payloads must never include PHI.
+
 ## Package layout
 
 ```
@@ -48,6 +53,8 @@ app/src/main/java/com/assessment/app/
   AssessmentApp.kt          Application entry
   MainActivity.kt           Single-activity host
   config/ApiConfig.kt       API base URL
+  push/PushConfig.kt        FCM config placeholders
+  push/AlertReceivedHandler.kt  Alert-received stub path
   ui/login/LoginScreen.kt   Login placeholders
   ui/theme/Theme.kt         Minimal Material 3 theme
 ```
