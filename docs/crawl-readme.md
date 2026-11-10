@@ -25,8 +25,8 @@ docker compose --profile otel up --build
 
 | Surface | URL / check |
 |---------|-------------|
-| Crawl API | `http://localhost:8080` · `GET /health` · Swagger `/swagger` |
-| Crawl Worker | `http://localhost:8081/health` + competing consumer on `crawl.page` |
+| Crawl API | `http://localhost:8080` · `GET /health` · Swagger `/swagger` · SignalR `/hubs/crawl-jobs` · `GET /api/ops/queue` |
+| Crawl Worker | `http://localhost:8081/health` · `GET /ops/queue` + competing consumer on `crawl.page` |
 | React UI | `http://localhost:3000` · `/crawl`, `/crawl/jobs/:id`, `/crawl/history` · `VITE_CRAWL_API_URL` |
 | RabbitMQ UI | `http://localhost:15672` (default guest/guest) |
 | Postgres | `app` DB = platform · `crawl` DB = crawler (`docker/postgres-init`) |
@@ -122,7 +122,7 @@ Worker flow: persist page row → publish `CrawlPageRequested` only after save; 
 | Internal vs external | Compare link `IdnHost` to `StartHost` (case-insensitive). |
 | Ignored schemes | `mailto:`, `tel:`, relative non-http, etc. — not counted in numerator or denominator. |
 | Depth | Children enqueued only when `parentDepth < maxDepth` (default **2**). |
-| Page budget | `maxPages` (default **5000**, hard cap **5000**) — stop inserting new child rows when budget is exhausted. |
+| Page budget | `maxPages` (default **200**) — stop inserting new child rows when budget is exhausted. |
 | Fan-out order | Internal links only become crawl tasks; stable lexicographic URL order within a depth (BFS-aware with RabbitMQ priority). |
 | URL graph | `UrlNormalizer` canonical form + optional sorted query before unique indexes; see [crawl.md](crawl.md#engine-scrapy-inspired-job-crawler). |
 | robots.txt | Default on — Disallow/Allow longest-prefix, optional `Crawl-delay`; fail-open if robots fetch fails. |
@@ -148,12 +148,12 @@ Operator: inspect DLQ in RabbitMQ management UI; replay is deliberate (not auto)
 
 ## Known limits
 
-- Max depth default **2**; max pages per job default **5000** (hard cap **5000**); HTML-only (no JS render).
+- Max depth default **2**; max pages per job ~**200**; HTML-only (no JS render).
 - No SSRF allowlist yet (known gap vs production).
-- Polling UI (SignalR/SSE cut from 4h path).
-- Per-job write serialization may cap huge single-job throughput at large page budgets (up to 5000).
+- SignalR live push is **on** for Job Details; REST poll remains the fallback if the hub drops.
+- Per-job write serialization may cap huge single-job throughput (fine at 200 pages); scale **workers** on queue depth instead.
 - Auth optional locally; cloud UI expects platform auth.
-- robots.txt / politeness / redirect-loop guards / query-sort dedup are **on** (see [crawl.md](crawl.md)); still not a Scrapy port.
+- robots.txt / politeness (incl. cross-worker advisory lock) / redirect-loop guards / query-sort dedup / atomic page claim are **on** (see [crawl.md](crawl.md)); still not a Scrapy port.
 
 ---
 
@@ -168,15 +168,16 @@ Maps the home-assignment **implemented first / cut / next** trade-offs from the 
 | Domain tests — `UrlNormalizer` + **Domain Link Ratio** | Wrong graph math invalidates the whole demo; cheap to test; blocks API/UI lies about ratios. |
 | API + Postgres — jobs/pages/edges, create/status/tree/history/cancel/health | Contract the UI and worker share; persistence proves idempotent schema before broker load. |
 | Worker + RabbitMQ — consume, fetch, parse, upsert, retries/DLQ | Rubric’s async boundary; without at-least-once + DLQ the job model is incomplete. |
-| React poll UI — Start / Details / History | End-to-end proof for reviewers; polling is enough for a timed crawl. |
+| React Start / Details / History (PDF flow) | End-to-end proof; Job Details uses SignalR with poll fallback. |
 | Docker Compose + this README + CI | One-command repro + gates on `dotnet test` / docker builds — submission hygiene. |
+| Queue-backed elastic workers + claim/DLQ edge hardening | Long jobs scale by adding consumers; multi-worker safe; ops queue depth signals. |
 
 ### Cut if needed — and why
 
 | Cut | Why it was deferrable |
 |-----|------------------------|
-| SignalR / SSE live push | Polling + per-job page budget is acceptable for assessment; push adds broker/UI coupling for little rubric credit. |
-| `terraform apply` / live AWS cutover | **Forbidden** in prep/CI anyway; sketches (`CRAWL_CLOUD.md`, modules) document scale without account risk. |
+| Per-job ephemeral EC2 provisioner | Stretch-next; ECS/ASG consumers on RabbitMQ fit the assessment architecture better. |
+| `terraform apply` / live AWS cutover | **Forbidden** in prep/CI anyway; sketches (`CRAWL_CLOUD.md`, modules + `autoscaling.tf`) document scale without account risk. |
 | Salesforce live webhook, Rekognition screenshots | Role “much more” — interfaces/outbox stubs OK; live CRM/OCR needs creds and ops time. |
 | Strong SSRF allowlist | Known production gap; robots + politeness + redirect limits shipped first for crawl correctness. |
 | PDF / document link extraction | HTML-only rubric; sniff rejects `%PDF` bodies (see tests) — parsing PDFs is a different product surface. |
@@ -187,7 +188,8 @@ Maps the home-assignment **implemented first / cut / next** trade-offs from the 
 |------|-----------|
 | Payer portal / clearinghouse adapters + field-finder | Shows RCM fit once crawl graph is trustworthy. |
 | X12/FHIR integration path (not a weekend EDI engine) | Honest senior scope — document contracts, don’t fake claims adjudication. |
-| Worker autoscaling on Amazon MQ depth + alarms | Needs real AWS + metrics; local Compose proves consumer logic. |
+| Wire CW metric publisher from `/api/ops/queue` → live Amazon MQ ASG | Sketch exists; needs authorized apply + broker metrics IAM. |
+| Ephemeral scale-out host pool that drains then terminates | Operator-runnable next after ECS desired_count elasticity. |
 | Vault-backed assisted login + full audit | Security-sensitive; must not block graded HTML crawl. |
 | SSRF allowlist + optional JS render / PDF text extract | Production hardening beyond timed HTML depth crawl. |
 
@@ -199,7 +201,7 @@ Same .NET contracts in AWS; operators read **job results from the cloud Crawl AP
 
 | Local Compose | AWS shape |
 |---------------|-----------|
-| `crawl-api` / `crawl-worker` | ECS Fargate services (scale workers on queue depth) |
+| `crawl-api` / `crawl-worker` | ECS Fargate services (scale workers on queue depth; SignalR on API) |
 | `db` (`crawl`) | Aurora PostgreSQL |
 | `rabbitmq` | Amazon MQ (RabbitMQ engine) |
 | `frontend` | CloudFront + S3 (or container behind ALB) |
@@ -209,7 +211,7 @@ Same .NET contracts in AWS; operators read **job results from the cloud Crawl AP
 Terraform module **sketches** (not wired into root apply):
 
 - [`infra/terraform/modules/amazon-mq/`](../infra/terraform/modules/amazon-mq/) — broker + SG notes  
-- [`infra/terraform/modules/crawl-ecs/`](../infra/terraform/modules/crawl-ecs/) — Crawl API/Worker task defs + MQ env  
+- [`infra/terraform/modules/crawl-ecs/`](../infra/terraform/modules/crawl-ecs/) — Crawl API/Worker task defs + MQ env + **`autoscaling.tf`** (queue-depth scale-out/in)  
 - Notes: [`infra/terraform/CRAWL_CLOUD.md`](../infra/terraform/CRAWL_CLOUD.md)
 
 **Forbidden until explicitly authorized:** `terraform apply` / `destroy`. Validate only: `fmt`, `init -backend=false`, `validate`.

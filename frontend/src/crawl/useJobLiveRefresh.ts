@@ -1,6 +1,9 @@
 /**
  * Job Details live refresh — SignalR push with REST poll fallback.
  * Single owner of refresh timing so layout components stay dumb.
+ *
+ * Unmount/navigation only tears down this hook (poll timer + hub connection).
+ * That never calls POST /cancel — workers keep processing until the job finishes or the user cancels explicitly.
  */
 import {
   HttpTransportType,
@@ -164,6 +167,7 @@ export function useJobLiveRefresh({
       const conn = connectionRef.current
       connectionRef.current = null
       if (conn && conn.state !== HubConnectionState.Disconnected) {
+        // Hub unsubscribe is UI-only; closing SignalR does not stop the crawl job.
         void conn.invoke('UnsubscribeJob', jobId).catch(() => undefined)
         void conn.stop()
       }

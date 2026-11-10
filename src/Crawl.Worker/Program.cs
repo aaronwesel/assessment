@@ -102,6 +102,24 @@ try
         });
     });
 
+    // Scale signal for local demos / operator probes (same shape as API /api/ops/queue).
+    app.MapGet("/ops/queue", (RabbitMqQueueStats stats) =>
+    {
+        var snap = stats.ReadPageQueue();
+        return Results.Ok(new
+        {
+            service = "Crawl.Worker",
+            queue = snap.Queue,
+            messagesReady = snap.MessagesReady,
+            consumerCount = snap.ConsumerCount,
+            dlqMessages = snap.DlqMessages,
+            suggestScaleOut = snap.SuggestScaleOut(),
+            suggestScaleIn = snap.SuggestScaleIn(),
+            healthy = snap.Healthy,
+            atUtc = snap.AtUtc
+        });
+    });
+
     await app.RunAsync();
 }
 catch (Exception ex)
