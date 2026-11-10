@@ -58,10 +58,11 @@ public sealed class CrawlPageProcessor(
             return;
         }
 
-        // Idempotency: already terminal pages are no-ops on redelivery.
+        // Idempotency: already terminal pages are no-ops on redelivery; heal orphaned Queued rows if publish failed earlier.
         if (page.Status.IsTerminal())
         {
             logger.LogInformation("Page {PageId} already {Status}; acknowledging redelivery", page.Id, page.Status);
+            await RepublishQueuedPagesAsync(job, cancellationToken);
             await ReconcileJobAsync(job, cancellationToken);
             return;
         }
@@ -153,10 +154,10 @@ public sealed class CrawlPageProcessor(
             childMessages = await EnqueueChildrenAsync(job, page, childCandidates, now, cancellationToken);
         }
 
-        await ReconcileJobAsync(job, cancellationToken);
-
         foreach (var childMessage in childMessages)
             await publisher.PublishAsync(childMessage, cancellationToken);
+
+        await ReconcileJobAsync(job, cancellationToken);
 
         logger.LogInformation(
             "Processed page {PageId} links={LinkCount} internal={InternalCount} ratio={Ratio} children={Children}",
@@ -167,10 +168,78 @@ public sealed class CrawlPageProcessor(
             childMessages.Count);
     }
 
+    /// <summary>
+    /// When the consumer exhausts retries or routes to DLQ, mark non-terminal pages Failed so jobs cannot stall on Processing.
+    /// </summary>
+    public async Task RecordPageDeliveryFailureAsync(
+        CrawlPageRequested message,
+        string reason,
+        CancellationToken cancellationToken)
+    {
+        var job = await db.Jobs.FirstOrDefaultAsync(j => j.Id == message.JobId, cancellationToken);
+        if (job is null)
+            return;
+
+        if (job.Status is CrawlJobStatus.Canceled)
+            return;
+
+        var page = await db.Pages.FirstOrDefaultAsync(
+            p => p.Id == message.PageId && p.JobId == message.JobId,
+            cancellationToken);
+
+        if (page is null)
+        {
+            await RepublishQueuedPagesAsync(job, cancellationToken);
+            await ReconcileJobAsync(job, cancellationToken);
+            return;
+        }
+
+        if (page.Status.IsTerminal())
+        {
+            await RepublishQueuedPagesAsync(job, cancellationToken);
+            await ReconcileJobAsync(job, cancellationToken);
+            return;
+        }
+
+        page.MarkFailed(CrawlPage.TruncateError(reason) ?? "Message delivery failed", DateTimeOffset.UtcNow);
+        CrawlWorkerMetrics.PagesFailed.Add(1);
+        await FinalizeAsync(job, cancellationToken);
+    }
+
     private async Task FinalizeAsync(CrawlJob job, CancellationToken cancellationToken)
     {
         await db.SaveChangesAsync(cancellationToken);
         await ReconcileJobAsync(job, cancellationToken);
+    }
+
+    /// <summary>
+    /// Re-publish all Queued pages when a terminal page message is redelivered (e.g. Rabbit publish failed after DB commit).
+    /// </summary>
+    private async Task RepublishQueuedPagesAsync(CrawlJob job, CancellationToken cancellationToken)
+    {
+        if (job.Status.IsTerminal() || job.Status == CrawlJobStatus.Canceled)
+            return;
+
+        var queued = await db.Pages.AsNoTracking()
+            .Where(p => p.JobId == job.Id && p.Status == CrawlPageStatus.Queued)
+            .OrderBy(p => p.Depth)
+            .ThenBy(p => p.Url)
+            .ToListAsync(cancellationToken);
+
+        if (queued.Count == 0)
+            return;
+
+        logger.LogInformation(
+            "Republishing {Count} queued pages for job {JobId} after redelivery healing",
+            queued.Count,
+            job.Id);
+
+        foreach (var queuedPage in queued)
+        {
+            await publisher.PublishAsync(
+                new CrawlPageRequested(job.Id, queuedPage.Id, queuedPage.Url, queuedPage.Depth, DateTimeOffset.UtcNow),
+                cancellationToken);
+        }
     }
 
     private async Task<List<CrawlPageRequested>> EnqueueChildrenAsync(
