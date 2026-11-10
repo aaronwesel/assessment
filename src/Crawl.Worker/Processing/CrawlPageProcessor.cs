@@ -1,3 +1,4 @@
+using Crawl.Ai.Alerts;
 using Crawl.Ai.Incidents;
 using Crawl.Domain.Fetching;
 using Crawl.Domain.Incidents;
@@ -23,6 +24,7 @@ public sealed class CrawlPageProcessor(
     HtmlLinkExtractor linkExtractor,
     ICrawlMessagePublisher publisher,
     ICrawlIncidentMonitor incidentMonitor,
+    IJobSubscriberAlertService subscriberAlerts,
     IOptions<CrawlHttpOptions> httpOptions,
     ILogger<CrawlPageProcessor> logger)
 {
@@ -315,6 +317,12 @@ public sealed class CrawlPageProcessor(
         var prior = job.Status;
         job.ReconcileAfterPageFinished(root?.Status ?? CrawlPageStatus.Failed, pending, DateTimeOffset.UtcNow);
         await db.SaveChangesAsync(cancellationToken);
+
+        if (prior != job.Status && job.Status.IsTerminal())
+        {
+            await subscriberAlerts.TrySendTerminalStatusAlertAsync(job, cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
+        }
 
         if (prior != CrawlJobStatus.Failed && job.Status == CrawlJobStatus.Failed)
         {

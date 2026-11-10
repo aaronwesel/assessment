@@ -20,6 +20,7 @@ import {
   CrawlLoading,
 } from '../../components/crawl/CrawlStates'
 import { ElementPickExport } from '../../components/crawl/ElementPickExport'
+import { JobAlertPreference } from '../../components/crawl/JobAlertPreference'
 import { JobProgress } from '../../components/crawl/JobProgress'
 import { JobResultsHub } from '../../components/crawl/JobResultsHub'
 import { PageTree } from '../../components/crawl/PageTree'
@@ -133,7 +134,14 @@ export function JobDetailsPage() {
 
           <div className="crawl-details-guided-row">
             <div className="crawl-details-primary">
-          <JobSummary job={job} live={live} onCanceled={() => void loadJob()} />
+          <JobSummary
+            job={job}
+            live={live}
+            guided={guided}
+            terminal={terminal}
+            onCanceled={() => void loadJob()}
+            onAlertPreferenceSaved={(next) => setJob(next)}
+          />
 
           {live ? (
             <section
@@ -200,11 +208,17 @@ export function JobDetailsPage() {
 function JobSummary({
   job,
   live,
+  guided,
+  terminal,
   onCanceled,
+  onAlertPreferenceSaved,
 }: {
   job: CrawlJob
   live: boolean
+  guided: boolean
+  terminal: boolean
   onCanceled: () => void
+  onAlertPreferenceSaved: (job: CrawlJob) => void
 }) {
   const [cancelPending, setCancelPending] = useState(false)
   const [cancelError, setCancelError] = useState<string | null>(null)
@@ -271,6 +285,16 @@ function JobSummary({
         progressPercent={job.progressPercent}
         live={live}
       />
+
+      {guided || live ? (
+        <JobAlertPreference
+          jobId={job.jobId}
+          initialEmail={job.alertEmail}
+          statusAlertSent={job.statusAlertSent}
+          terminal={terminal}
+          onSaved={onAlertPreferenceSaved}
+        />
+      ) : null}
 
       <div className="crawl-summary-actions">
         {live ? (

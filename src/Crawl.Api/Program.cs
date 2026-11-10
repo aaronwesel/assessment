@@ -156,6 +156,22 @@ try
         .WithName("CancelJob")
         .WithOpenApi();
 
+    jobs.MapPut("/{jobId:guid}/alert-email", async (
+            Guid jobId,
+            SetJobAlertEmailRequest request,
+            JobService service,
+            CancellationToken ct) =>
+        {
+            var (found, summary, error) = await service.SetAlertEmailAsync(jobId, request, ct);
+            if (!found)
+                return Results.NotFound();
+            if (error is not null)
+                return Results.ValidationProblem(new Dictionary<string, string[]> { ["email"] = [error] });
+            return Results.Ok(summary);
+        })
+        .WithName("SetJobAlertEmail")
+        .WithOpenApi();
+
     app.MapCrawlAi();
 
     // Liveness: process up. Readiness: Postgres + RabbitMQ. Keep /health as ready for Compose.

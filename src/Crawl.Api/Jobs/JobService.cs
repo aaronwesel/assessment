@@ -1,3 +1,4 @@
+using Crawl.Ai.Alerts;
 using Crawl.Domain.Jobs;
 using Crawl.Domain.Links;
 using Crawl.Domain.Messaging;
@@ -15,7 +16,7 @@ namespace Crawl.Api.Jobs;
 public sealed class JobService(
     CrawlDbContext db,
     ICrawlMessagePublisher publisher,
-    IJobProgressPublisher progressPublisher,
+    IJobSubscriberAlertService subscriberAlerts,
     ILogger<JobService> logger)
 {
     public async Task<(CreateJobResponse? Response, string? Error)> CreateAsync(
@@ -31,8 +32,8 @@ public sealed class JobService(
         if (maxDepth is < 0 or > CrawlJob.AbsoluteMaxDepth)
             return (null, $"maxDepth must be between 0 and {CrawlJob.AbsoluteMaxDepth}.");
 
-        if (maxPages is < 1 or > CrawlJob.AbsoluteMaxPages)
-            return (null, $"maxPages must be between 1 and {CrawlJob.AbsoluteMaxPages}.");
+        if (maxPages is < 1 or > CrawlJob.DefaultMaxPages)
+            return (null, $"maxPages must be between 1 and {CrawlJob.DefaultMaxPages}.");
 
         var now = DateTimeOffset.UtcNow;
         var job = CrawlJob.Create(normalized, maxDepth, maxPages, now);
@@ -44,10 +45,6 @@ public sealed class JobService(
 
         await publisher.PublishAsync(
             new CrawlPageRequested(job.Id, root.Id, root.Url, root.Depth, now),
-            cancellationToken);
-
-        await progressPublisher.PublishAsync(
-            CrawlJobProgressEvent.FromJobAndPages(job, [root], CrawlJobProgressEvent.KindCreated, now),
             cancellationToken);
 
         logger.LogInformation("Created crawl job {JobId} for {Url}", job.Id, job.Url);
@@ -140,18 +137,43 @@ public sealed class JobService(
         if (job.Status.IsTerminal())
             return (true, false, $"Job already {job.Status}.");
 
-        var now = DateTimeOffset.UtcNow;
-        job.MarkCanceled(now);
+        job.MarkCanceled(DateTimeOffset.UtcNow);
         await db.SaveChangesAsync(cancellationToken);
+        await subscriberAlerts.TrySendTerminalStatusAlertAsync(job, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        logger.LogInformation("Canceled crawl job {JobId}", jobId);
+        return (true, true, null);
+    }
+
+    public async Task<(bool Found, JobSummaryDto? Summary, string? Error)> SetAlertEmailAsync(
+        Guid jobId,
+        SetJobAlertEmailRequest request,
+        CancellationToken cancellationToken)
+    {
+        var job = await db.Jobs.FirstOrDefaultAsync(j => j.Id == jobId, cancellationToken);
+        if (job is null)
+            return (false, null, null);
+
+        try
+        {
+            job.SetAlertEmail(request.Email);
+        }
+        catch (ArgumentException ex)
+        {
+            return (true, null, ex.Message);
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        if (job.Status.IsTerminal() && job.HasAlertSubscription && !job.StatusAlertSent)
+        {
+            await subscriberAlerts.TrySendTerminalStatusAlertAsync(job, cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
+        }
 
         var pages = await db.Pages.AsNoTracking()
             .Where(p => p.JobId == jobId)
             .ToListAsync(cancellationToken);
-        await progressPublisher.PublishAsync(
-            CrawlJobProgressEvent.FromJobAndPages(job, pages, CrawlJobProgressEvent.KindCanceled, now),
-            cancellationToken);
-
-        logger.LogInformation("Canceled crawl job {JobId}", jobId);
-        return (true, true, null);
+        return (true, JobDtoMapper.ToSummary(job, pages), null);
     }
 }

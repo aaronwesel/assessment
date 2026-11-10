@@ -3,6 +3,7 @@ using Crawl.Ai.DeepSeek;
 using Crawl.Ai.Incidents;
 using Crawl.Ai.Options;
 using Crawl.Domain.Incidents;
+using Crawl.Domain.Jobs;
 using Crawl.Infrastructure.Egress;
 using Crawl.Infrastructure.Http;
 using Crawl.Infrastructure.Persistence;
@@ -42,6 +43,7 @@ public class IncidentMonitorTests
             new RemediationAgent(new FakeDeepSeek(false), NullLogger<RemediationAgent>.Instance),
             applicator,
             new NoopAlerts(),
+            new NoopSubscriberAlerts(),
             OptionsFactory.Create(new CrawlAiOptions { Enabled = true, IncidentMonitorEnabled = true }),
             OptionsFactory.Create(new CrawlAlertOptions { EmailEnabled = false }),
             NullLogger<CrawlIncidentMonitor>.Instance);
@@ -76,6 +78,7 @@ public class IncidentMonitorTests
             new RemediationAgent(new FakeDeepSeek(false), NullLogger<RemediationAgent>.Instance),
             applicator,
             new NoopAlerts(),
+            new NoopSubscriberAlerts(),
             OptionsFactory.Create(new CrawlAiOptions { Enabled = true, IncidentMonitorEnabled = true }),
             OptionsFactory.Create(new CrawlAlertOptions()),
             NullLogger<CrawlIncidentMonitor>.Instance);
@@ -123,6 +126,19 @@ public class IncidentMonitorTests
             string alertCode,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(false);
+    }
+
+    private sealed class NoopSubscriberAlerts : IJobSubscriberAlertService
+    {
+        public Task TrySendTerminalStatusAlertAsync(CrawlJob job, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task TrySendIncidentAlertAsync(
+            CrawlJob job,
+            CrawlIncident incident,
+            string alertCode,
+            CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
     }
 
     private sealed class OptionsMonitorStub<T>(T value) : IOptionsMonitor<T>

@@ -5,6 +5,8 @@ namespace Crawl.Api.Jobs;
 
 public sealed record CreateJobRequest(string Url, int? MaxDepth = null, int? MaxPages = null);
 
+public sealed record SetJobAlertEmailRequest(string? Email);
+
 public sealed record CreateJobResponse(Guid JobId);
 
 public sealed record PageCountsDto(
@@ -27,7 +29,9 @@ public sealed record JobSummaryDto(
     string? FailureReason,
     PageCountsDto PageCounts,
     /// <summary>0–100 progress from terminal pages / max(total, maxPages budget signal).</summary>
-    int ProgressPercent);
+    int ProgressPercent,
+    string? AlertEmail,
+    bool StatusAlertSent);
 
 public sealed record JobHistoryItemDto(
     Guid JobId,
@@ -91,7 +95,9 @@ public static class JobDtoMapper
             job.CompletedAt,
             job.FailureReason,
             new PageCountsDto(pages.Count, queued, processing, done, skipped, failed),
-            progress);
+            progress,
+            job.AlertEmail,
+            job.StatusAlertSent);
     }
 
     public static JobTreeDto ToTree(CrawlJob job, IReadOnlyList<CrawlPage> pages) =>

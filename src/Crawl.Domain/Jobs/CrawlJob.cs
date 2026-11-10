@@ -10,6 +10,7 @@ public class CrawlJob
 {
     public const int UrlMaxLength = 2048;
     public const int FailureReasonMaxLength = 500;
+    public const int AlertEmailMaxLength = 320;
     public const int DefaultMaxDepth = 2;
     public const int DefaultMaxPages = 5000;
     /// <summary>Per-job hard cap for maxPages (aligned with free billing page allowance).</summary>
@@ -29,7 +30,15 @@ public class CrawlJob
     public DateTimeOffset? CompletedAt { get; private set; }
     public string? FailureReason { get; private set; }
 
+    /// <summary>Operator email for job completion / issue alerts (guided step 5). PHI-free templates only.</summary>
+    public string? AlertEmail { get; private set; }
+
+    /// <summary>True after a terminal-status subscriber alert was attempted for this job.</summary>
+    public bool StatusAlertSent { get; private set; }
+
     public ICollection<CrawlPage> Pages { get; private set; } = new List<CrawlPage>();
+
+    public bool HasAlertSubscription => !string.IsNullOrWhiteSpace(AlertEmail);
 
     public bool CanEnqueueChildrenOf(int parentDepth) => parentDepth < MaxDepth;
 
@@ -92,6 +101,40 @@ public class CrawlJob
         }
 
         Status = CrawlJobStatus.Running;
+    }
+
+    public void SetAlertEmail(string? email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            AlertEmail = null;
+            return;
+        }
+
+        var trimmed = email.Trim();
+        if (trimmed.Length > AlertEmailMaxLength)
+            throw new ArgumentException($"Email must be at most {AlertEmailMaxLength} characters.", nameof(email));
+
+        if (!LooksLikeEmail(trimmed))
+            throw new ArgumentException("Email address format is invalid.", nameof(email));
+
+        AlertEmail = trimmed;
+    }
+
+    /// <returns>False when a status alert was already marked sent.</returns>
+    public bool TryMarkStatusAlertSent()
+    {
+        if (StatusAlertSent)
+            return false;
+
+        StatusAlertSent = true;
+        return true;
+    }
+
+    private static bool LooksLikeEmail(string value)
+    {
+        var at = value.IndexOf('@');
+        return at > 0 && at < value.Length - 1 && !value.Contains(' ');
     }
 
     public static CrawlJob Create(Uri normalizedStartUrl, int maxDepth, int maxPages, DateTimeOffset createdAtUtc)

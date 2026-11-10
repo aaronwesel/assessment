@@ -84,7 +84,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IClearinghouseClient, StubClearinghouseClient>();
         services.AddScoped<IRemediationAgent, RemediationAgent>();
         services.AddScoped<ICrawlIncidentMonitor, CrawlIncidentMonitor>();
+        services.AddSingleton<ICrawlSesEmailTransport, CrawlSesEmailTransport>();
         services.AddSingleton<ICrawlAlertSender, CrawlAlertSender>();
+        services.AddSingleton<IJobSubscriberAlertService, JobSubscriberAlertService>();
 
         return services;
     }
