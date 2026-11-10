@@ -8,6 +8,7 @@
 import { config } from '../config'
 
 export type JobStatus = 'Pending' | 'Running' | 'Completed' | 'Failed' | 'Canceled'
+/** Matches Crawl.Domain.Pages.CrawlPageStatus (stringified). */
 export type PageStatus = 'Queued' | 'Processing' | 'Done' | 'Skipped' | 'Failed'
 
 export interface PageCounts {
@@ -80,7 +81,10 @@ export interface ProblemDetails {
   title?: string
   detail?: string
   status?: number
+  /** ASP.NET ValidationProblem field map (camelCase keys). */
   errors?: Record<string, string[]>
+  /** Cancel conflict body: `{ error: "Job already Completed." }`. */
+  error?: string
 }
 
 export class CrawlApiError extends Error {
@@ -88,7 +92,16 @@ export class CrawlApiError extends Error {
   problem: ProblemDetails
 
   constructor(status: number, problem: ProblemDetails) {
-    super(problem.detail ?? problem.title ?? `Request failed (${status})`)
+    const fieldMsgs = problem.errors
+      ? Object.values(problem.errors).flat().filter(Boolean)
+      : []
+    super(
+      problem.detail ??
+        problem.error ??
+        (fieldMsgs.length ? fieldMsgs.join(' ') : undefined) ??
+        problem.title ??
+        `Request failed (${status})`,
+    )
     this.name = 'CrawlApiError'
     this.status = status
     this.problem = problem

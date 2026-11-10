@@ -1,5 +1,5 @@
 /**
- * Crawl history — paginated jobs; open Job Details.
+ * Crawl history — paginated jobs with clear empty/error paths and next actions.
  */
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
@@ -9,6 +9,12 @@ import {
   type JobSummary,
   type PagedResult,
 } from '../../api/crawl'
+import { CrawlShell } from '../../components/crawl/CrawlShell'
+import {
+  CrawlEmpty,
+  CrawlError,
+  CrawlLoading,
+} from '../../components/crawl/CrawlStates'
 import { StatusBadge } from '../../components/crawl/StatusBadge'
 import { formatDateTime } from '../../crawl/format'
 
@@ -42,43 +48,52 @@ export function HistoryPage() {
   }, [load])
 
   const goToPage = (next: number) => setSearchParams({ page: String(next) })
+  const totalPages = data
+    ? Math.max(1, Math.ceil(data.totalCount / data.pageSize))
+    : 1
 
   return (
-    <main className="page crawl-page crawl-page-wide">
-      <div className="crawl-header">
-        <h1>Crawl history</h1>
-        <Link className="nav-link" to="/crawl">
-          New crawl
+    <CrawlShell
+      title="Crawl history"
+      lede="Recent jobs, newest first. Open any row to inspect progress, the page tree, and Domain Link Ratio."
+      wide
+      actions={
+        <Link className="btn btn-primary" to="/crawl">
+          Start crawl
         </Link>
-      </div>
-
-      {loading && !data ? <p className="hint">Loading history…</p> : null}
+      }
+    >
+      {loading && !data ? <CrawlLoading label="Loading crawl history…" /> : null}
 
       {error ? (
-        <div className="crawl-panel" role="alert">
-          <p className="form-error">{error}</p>
-          <button type="button" className="btn btn-ghost" onClick={() => void load()}>
-            Retry
-          </button>
-        </div>
+        <CrawlError message={error} onRetry={() => void load()} />
       ) : null}
 
       {!error && data && data.totalCount === 0 ? (
-        <p className="hint">
-          No crawls yet. <Link to="/crawl">Start one</Link>.
-        </p>
+        <CrawlEmpty
+          title="No crawls yet"
+          actionTo="/crawl"
+          actionLabel="Start your first crawl"
+        >
+          History fills as jobs complete. Start from a public HTML URL to see the
+          tree and Domain Link Ratio.
+        </CrawlEmpty>
       ) : null}
 
       {!error && data && data.totalCount > 0 ? (
-        <>
+        <section className="crawl-history-panel crawl-rise-delay" aria-label="Jobs">
           {data.items.length > 0 ? (
-            <JobTable items={data.items} busy={loading} />
+            <JobList items={data.items} busy={loading} />
           ) : (
-            <p className="hint">
-              No jobs on this page.{' '}
-              <Link to="/crawl/history">Go to the first page</Link>.
-            </p>
+            <CrawlEmpty
+              title="Nothing on this page"
+              actionTo="/crawl/history"
+              actionLabel="Back to first page"
+            >
+              Try an earlier page of results.
+            </CrawlEmpty>
           )}
+
           <nav className="crawl-pager" aria-label="Pagination">
             <button
               type="button"
@@ -88,61 +103,56 @@ export function HistoryPage() {
             >
               Previous
             </button>
-            <span className="hint">
-              Page {page} of {Math.max(1, Math.ceil(data.totalCount / data.pageSize))}{' '}
-              ({data.totalCount} jobs)
+            <span className="crawl-pager-status">
+              Page {page} of {totalPages}
+              <span className="hint"> · {data.totalCount} jobs</span>
             </span>
             <button
               type="button"
               className="btn btn-ghost"
               onClick={() => goToPage(page + 1)}
-              disabled={
-                page >= Math.max(1, Math.ceil(data.totalCount / data.pageSize)) ||
-                loading
-              }
+              disabled={page >= totalPages || loading}
             >
               Next
             </button>
           </nav>
-        </>
+        </section>
       ) : null}
-    </main>
+    </CrawlShell>
   )
 }
 
-function JobTable({ items, busy }: { items: JobSummary[]; busy: boolean }) {
+function JobList({ items, busy }: { items: JobSummary[]; busy: boolean }) {
   const navigate = useNavigate()
 
   return (
-    <div className="crawl-table-wrap">
-      <table className="crawl-table" aria-busy={busy}>
-        <thead>
-          <tr>
-            <th scope="col">URL</th>
-            <th scope="col">Status</th>
-            <th scope="col">Created</th>
-            <th scope="col">Completed</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((job) => (
-            <tr
-              key={job.jobId}
-              className="crawl-table-row"
-              onClick={() => navigate(`/crawl/jobs/${job.jobId}`)}
-            >
-              <td>
-                <Link to={`/crawl/jobs/${job.jobId}`}>{job.url}</Link>
-              </td>
-              <td>
-                <StatusBadge status={job.status} />
-              </td>
-              <td>{formatDateTime(job.createdAt)}</td>
-              <td>{formatDateTime(job.completedAt)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <ul className="crawl-job-list" aria-busy={busy}>
+      {items.map((job) => (
+        <li key={job.jobId}>
+          <button
+            type="button"
+            className="crawl-job-row"
+            onClick={() => navigate(`/crawl/jobs/${job.jobId}`)}
+          >
+            <div className="crawl-job-row-main">
+              <span className="crawl-job-url">{job.url}</span>
+              <span className="crawl-job-times">
+                Created {formatDateTime(job.createdAt)}
+                {job.completedAt
+                  ? ` · Completed ${formatDateTime(job.completedAt)}`
+                  : ''}
+              </span>
+            </div>
+            <StatusBadge status={job.status} />
+            <span className="crawl-job-open" aria-hidden="true">
+              Open
+            </span>
+          </button>
+          <Link className="visually-hidden" to={`/crawl/jobs/${job.jobId}`}>
+            Open job {job.url}
+          </Link>
+        </li>
+      ))}
+    </ul>
   )
 }

@@ -4,6 +4,24 @@ import { formatPercent } from '../../crawl/format'
 import { PageLinks } from './PageLinks'
 import { StatusBadge } from './StatusBadge'
 
+function DlrMeter({ ratio }: { ratio: number | null }) {
+  if (ratio === null) {
+    return <span className="crawl-dlr crawl-dlr-empty">DLR —</span>
+  }
+  const pct = Math.max(0, Math.min(100, ratio * 100))
+  return (
+    <span
+      className="crawl-dlr"
+      title="Domain Link Ratio: internal http(s) links on start host / total http(s) outgoing"
+    >
+      <span className="crawl-dlr-label">DLR {formatPercent(ratio)}</span>
+      <span className="crawl-dlr-track" aria-hidden="true">
+        <span className="crawl-dlr-fill" style={{ width: `${pct}%` }} />
+      </span>
+    </span>
+  )
+}
+
 export function PageTreeNode({
   jobId,
   node,
@@ -16,9 +34,16 @@ export function PageTreeNode({
   const childrenId = useId()
   const linksId = useId()
   const hasChildren = node.children.length > 0
+  const pathLabel = (() => {
+    try {
+      return new URL(node.url).pathname || '/'
+    } catch {
+      return node.url
+    }
+  })()
 
   return (
-    <li className="crawl-tree-node">
+    <li className="crawl-tree-node" style={{ ['--depth' as string]: node.depth }}>
       <div className="crawl-tree-row">
         {hasChildren ? (
           <button
@@ -34,32 +59,45 @@ export function PageTreeNode({
         ) : (
           <span className="crawl-toggle" aria-hidden="true" />
         )}
-        <a href={node.url} target="_blank" rel="noreferrer" className="crawl-tree-url">
-          {node.url}
-        </a>
-        <StatusBadge status={node.status} />
-        <span className="hint">depth {node.depth}</span>
-        <span title="Domain Link Ratio: internal links / total links">
-          DLR {formatPercent(node.domainLinkRatio)}
-        </span>
-        {node.linkCount !== null && (
-          <button
-            type="button"
-            className="btn btn-ghost crawl-link-toggle"
-            aria-expanded={showLinks}
-            aria-controls={linksId}
-            onClick={() => setShowLinks((value) => !value)}
+
+        <div className="crawl-tree-main">
+          <a
+            href={node.url}
+            target="_blank"
+            rel="noreferrer"
+            className="crawl-tree-url"
+            title={node.url}
           >
-            {node.linkCount} links ({node.internalLinkCount ?? 0} internal)
-          </button>
-        )}
+            <span className="crawl-tree-path">{pathLabel}</span>
+            <span className="crawl-tree-host">{node.url}</span>
+          </a>
+          <div className="crawl-tree-meta">
+            <StatusBadge status={node.status} />
+            <span className="crawl-depth-chip">depth {node.depth}</span>
+            <DlrMeter ratio={node.domainLinkRatio} />
+            {node.linkCount !== null ? (
+              <button
+                type="button"
+                className="btn btn-ghost crawl-link-toggle"
+                aria-expanded={showLinks}
+                aria-controls={linksId}
+                onClick={() => setShowLinks((value) => !value)}
+              >
+                {node.linkCount} links · {node.internalLinkCount ?? 0} internal
+              </button>
+            ) : null}
+          </div>
+        </div>
       </div>
-      {node.error ? <p className="form-error">Error: {node.error}</p> : null}
+
+      {node.error ? <p className="form-error crawl-node-error">Error: {node.error}</p> : null}
+
       {showLinks ? (
         <div id={linksId} className="crawl-tree-links">
           <PageLinks jobId={jobId} pageId={node.pageId} />
         </div>
       ) : null}
+
       {hasChildren && expanded ? (
         <ul id={childrenId} className="crawl-tree">
           {node.children.map((child) => (

@@ -1,28 +1,30 @@
 .crawl-ai {
-  margin-top: 1.5rem;
-  padding-top: 1rem;
-  border-top: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  margin-top: 0.25rem;
 }
 
 .crawl-ai__header h2 {
   margin: 0 0 0.25rem;
-  font-size: 1.15rem;
+  font-family: var(--display);
+  font-size: 1.3rem;
 }
 
 .crawl-ai__header p,
 .crawl-ai__muted {
-  margin: 0.25rem 0 0.75rem;
-  opacity: 0.75;
+  margin: 0.25rem 0 0.85rem;
+  color: var(--muted);
   font-size: 0.9rem;
 }
 
 .crawl-ai__block {
-  margin-bottom: 1.25rem;
+  margin-bottom: 1.15rem;
+  padding: 0.85rem 0 0;
+  border-top: 1px solid var(--line);
 }
 
 .crawl-ai__block h3 {
   margin: 0 0 0.5rem;
-  font-size: 1rem;
+  font-family: var(--display);
+  font-size: 1.05rem;
 }
 
 .crawl-ai__block textarea,
@@ -31,22 +33,43 @@
   width: 100%;
   max-width: 40rem;
   margin: 0.35rem 0 0.5rem;
-  padding: 0.45rem 0.55rem;
+  padding: 0.55rem 0.65rem;
   font: inherit;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.crawl-ai__block textarea:focus,
+.crawl-ai__block input:focus {
+  outline: 2px solid color-mix(in srgb, var(--primary) 45%, white);
+  outline-offset: 1px;
+  border-color: var(--primary);
 }
 
 .crawl-ai__label {
   display: block;
   margin: 0.5rem 0;
   font-size: 0.9rem;
+  color: var(--muted);
 }
 
 .crawl-ai__block button,
 .crawl-ai__actions button {
   margin: 0.25rem 0.5rem 0.25rem 0;
-  padding: 0.35rem 0.7rem;
+  padding: 0.45rem 0.8rem;
   font: inherit;
   cursor: pointer;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+}
+
+.crawl-ai__block button:hover,
+.crawl-ai__actions button:hover {
+  background: var(--bg-accent);
 }
 
 .crawl-ai__block ul,
