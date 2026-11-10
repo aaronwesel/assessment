@@ -27,7 +27,7 @@ export function CrawlShell({ title, lede, wide, children, actions }: Props) {
         <header className="crawl-console-top">
           <div className="crawl-brand-block">
             <p className="crawl-kicker">
-              <TrailmapLogo compact className="crawl-kicker-logo" /> Assessment job crawler
+              <TrailmapLogo compact className="crawl-kicker-logo" /> Trailmap Crawl
             </p>
             <h1 className="crawl-console-title">{title}</h1>
             {lede ? <p className="crawl-lede">{lede}</p> : null}

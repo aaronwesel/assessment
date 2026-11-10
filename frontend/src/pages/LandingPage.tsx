@@ -9,16 +9,27 @@ import { TrailmapLogo } from '../components/brand/TrailmapLogo'
 
 const HOW_IT_WORKS = [
   {
-    title: 'Paste a start URL',
-    body: 'We queue your seed page on RabbitMQ and walk only internal HTML links — no guessing from AI.',
+    title: 'What is a Web Crawler?',
+    body: (
+      <>
+        An automated explorer for your site. Give us a start URL, we follow internal links, and map how pages
+        connect — including simple health metrics along the way.
+      </>
+    ),
   },
   {
-    title: 'Workers crawl & measure',
-    body: 'Each parsed page gets Domain Link Ratio in .NET: internal links ÷ all links on that page.',
+    title: 'Try it — generous free tier',
+    body: (
+      <>
+        Free for the first 5,000 pages. Save jobs to your account, then export from the UI or plug into our{' '}
+        <Link to="/swagger">interactive Crawl API docs</Link> (and <Link to="/docs">Platform API</Link> when you need
+        billing or auth).
+      </>
+    ),
   },
   {
-    title: 'Export the tree',
-    body: 'Download CSV, JSON, or a readable report; retry with deeper depth or login assist when needed.',
+    title: 'Guided setup & alerts',
+    body: 'A friendly AI coach walks you through each step of setup. On the live progress screen you can optionally add an email for completion or issue alerts — so you don’t have to watch the job the whole time.',
   },
 ] as const
 
@@ -40,12 +51,6 @@ export function LandingPage() {
         <Link to="/crawl/history" className="landing-nav-link">
           History
         </Link>
-        <a href="/swagger" className="landing-nav-link">
-          Crawl API docs
-        </a>
-        <a href="/docs" className="landing-nav-link">
-          Platform API docs
-        </a>
         {isAuthenticated ? null : (
           <Link to="/login" className="landing-nav-link">
             Sign in
@@ -68,8 +73,8 @@ export function LandingPage() {
           </h1>
 
           <p className="landing-tagline-wide">
-            Trailmap Crawl is the assessment job crawler: queue a URL, watch the page tree grow, and understand{' '}
-            <strong>Domain Link Ratio</strong> without reading a spec sheet.
+            Trailmap Crawl helps you see how a website fits together — start with one URL, watch the map grow, and
+            export what you find without learning crawler jargon first.
           </p>
 
           <p className="landing-pricing-callout">
@@ -95,7 +100,7 @@ export function LandingPage() {
             )}
           </div>
 
-          <ol className="landing-steps-inline" aria-label="How it works in three steps">
+          <ol className="landing-steps-inline" aria-label="How Trailmap Crawl works">
             {HOW_IT_WORKS.map((item, i) => (
               <li key={item.title} className="landing-step-inline crawl-rise" style={{ animationDelay: `${0.12 * i}s` }}>
                 <span className="landing-step-num">{i + 1}</span>
@@ -110,9 +115,8 @@ export function LandingPage() {
       </section>
 
       <p className="landing-footnote hint">
-        Quick path for experts: <Link to="/crawl">Start crawl</Link> · Interactive API:{' '}
-        <a href="/swagger">Crawl Swagger</a> · <a href="/docs">FastAPI /docs</a> · AI advises only; link parsing stays
-        in .NET.
+        Prefer fewer steps? <Link to="/crawl">Quick start</Link> skips the wizard · API explorers:{' '}
+        <Link to="/swagger">Crawl</Link> · <Link to="/docs">Platform</Link>
       </p>
     </main>
   )

@@ -7,6 +7,7 @@ import { useAuth } from '../../auth/AuthContext'
 import { crawlApi, CrawlApiError } from '../../api/crawl'
 import { fetchCrawlPricing, type CrawlPricing } from '../../api/growth'
 import { AdvancedOptionsDrawer } from '../../components/crawl/AdvancedOptionsDrawer'
+import { WelcomeGeoGreeting } from '../../components/crawl/WelcomeGeoGreeting'
 import { CrawlFlowSteps } from '../../components/crawl/CrawlFlowSteps'
 import { CrawlShell } from '../../components/crawl/CrawlShell'
 import { DeepSeekGuide } from '../../components/crawl/DeepSeekGuide'
@@ -118,8 +119,8 @@ export function WelcomeWizardPage() {
 
   return (
     <CrawlShell
-      title="Guided crawl"
-      lede="Six numbered steps — plain language at each stage. AI guides; .NET workers parse links."
+      title="Welcome"
+      lede="Enter the website you want to explore, then press Continue on each step. When the summary looks right, start your crawl."
       wide
       actions={
         <>
@@ -132,6 +133,8 @@ export function WelcomeWizardPage() {
         </>
       }
     >
+      <WelcomeGeoGreeting />
+
       <div className="crawl-guided-layout">
         <div className="crawl-guided-main">
           <CrawlFlowSteps activeStep={step + 1} maxReachable={4} />
