@@ -26,6 +26,7 @@ export function CrawlFlowSteps({ activeStep, maxReachable = 6 }: Props) {
         return (
           <li
             key={label}
+            title={`Step ${n}: ${label}`}
             className={[
               'crawl-flow-step',
               done ? 'is-done' : '',

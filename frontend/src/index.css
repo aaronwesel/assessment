@@ -1933,6 +1933,12 @@ code {
   color: var(--primary);
 }
 
+.crawl-flow-label {
+  font-size: 0.78rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
 .crawl-guided-layout,
 .crawl-details-guided-row {
   display: grid;

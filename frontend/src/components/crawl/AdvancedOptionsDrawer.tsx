@@ -139,7 +139,16 @@ export function AdvancedOptionsDrawer({ open, onClose, value, onChange }: Props)
         </div>
 
         <footer className="crawl-drawer-foot">
-          <button type="button" className="btn btn-ghost" onClick={() => onChange({ ...DEFAULT_ADVANCED })}>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => {
+              const next = { ...DEFAULT_ADVANCED }
+              setDraft(next)
+              onChange(next)
+              saveAdvancedToStorage(next)
+            }}
+          >
             Reset defaults
           </button>
           <button type="button" className="btn btn-primary" onClick={save}>
