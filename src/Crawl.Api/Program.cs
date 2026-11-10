@@ -39,16 +39,7 @@ try
         options.SwaggerDoc("v1", new() { Title = "Crawl API", Version = "v1" });
     });
 
-    var rabbit = builder.Configuration.GetSection(RabbitMqOptions.SectionName).Get<RabbitMqOptions>()
-        ?? new RabbitMqOptions();
-    var crawlCs = builder.Configuration.GetConnectionString("Crawl")
-        ?? throw new InvalidOperationException("ConnectionStrings:Crawl is required.");
-
-    builder.Services.AddHealthChecks()
-        .AddNpgSql(crawlCs, name: "postgres")
-        .AddRabbitMQ(
-            $"amqp://{Uri.EscapeDataString(rabbit.UserName)}:{Uri.EscapeDataString(rabbit.Password)}@{rabbit.HostName}:{rabbit.Port}{rabbit.VirtualHost}",
-            name: "rabbitmq");
+    builder.Services.AddCrawlHealthChecks(builder.Configuration);
 
     builder.Services.AddOpenTelemetry()
         .ConfigureResource(r => r.AddService("Crawl.Api"))
@@ -175,7 +166,18 @@ try
     app.MapScaleSignals();
     app.MapHub<CrawlJobHub>("/hubs/crawl-jobs");
 
-    app.MapHealthChecks("/health");
+    app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+    {
+        Predicate = check => check.Tags.Contains("live")
+    });
+    app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+    {
+        Predicate = check => check.Tags.Contains("ready")
+    });
+    app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+    {
+        Predicate = check => check.Tags.Contains("ready")
+    });
     app.MapGet("/", () => Results.Redirect("/swagger"));
 
     await app.RunAsync();

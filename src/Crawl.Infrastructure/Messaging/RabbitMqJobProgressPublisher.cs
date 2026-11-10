@@ -26,7 +26,7 @@ public sealed class RabbitMqJobProgressPublisher(
         props.MessageId = $"{progress.JobId:N}:{progress.EventKind}:{progress.OccurredAt.UtcTicks}";
 
         channel.BasicPublish(
-            exchange: connectionFactory.Options.JobEventsExchange,
+            exchange: connectionFactory.Options.ProgressExchange,
             routingKey: string.Empty,
             basicProperties: props,
             body: body);

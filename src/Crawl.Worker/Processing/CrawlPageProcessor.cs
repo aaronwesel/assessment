@@ -402,18 +402,14 @@ public sealed class CrawlPageProcessor(
                 ? 100
                 : (int)Math.Clamp(Math.Round(100.0 * terminal / denominator), 0, 99);
 
+            var pageEntities = await db.Pages.AsNoTracking()
+                .Where(p => p.JobId == job.Id)
+                .ToListAsync(cancellationToken);
             await progressPublisher.PublishAsync(
-                new CrawlJobProgressEvent(
-                    job.Id,
-                    job.Status.ToString(),
-                    progress,
-                    pages.Count,
-                    queued,
-                    processing,
-                    done,
-                    skipped,
-                    failed,
-                    DateTimeOffset.UtcNow),
+                CrawlJobProgressEvent.FromJobAndPages(
+                    job,
+                    pageEntities,
+                    CrawlJobProgressEvent.KindPageProgress),
                 cancellationToken);
         }
         catch (Exception ex)

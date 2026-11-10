@@ -29,10 +29,10 @@ try
         .WriteTo.Console());
 
     builder.Services.AddCrawlInfrastructure(builder.Configuration);
-    builder.Services.AddCrawlMassTransitWorker<CrawlPageRequestedConsumer>(builder.Configuration);
     builder.Services.AddCrawlAi(builder.Configuration);
     builder.Services.AddScoped<HtmlPageFetcher>();
     builder.Services.AddScoped<CrawlPageProcessor>();
+    builder.Services.AddHostedService<CrawlPageConsumer>();
 
     builder.Services.AddCrawlHealthChecks(builder.Configuration);
 
@@ -41,9 +41,7 @@ try
         .WithTracing(t =>
         {
             t.AddHttpClientInstrumentation()
-                .AddEntityFrameworkCoreInstrumentation()
-                .AddSource("Crawl.Worker")
-                .AddSource("MassTransit");
+                .AddSource("Crawl.Worker");
 
             if (!string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]))
                 t.AddOtlpExporter();
@@ -82,25 +80,7 @@ try
     {
         Predicate = check => check.Tags.Contains("ready")
     });
-    app.MapGet("/", () => Results.Ok(new { service = "Crawl.Worker", status = "ok", bus = "MassTransit" }));
-
-    // Scale signal for local demos / operator probes (same shape as API /api/ops/queue).
-    app.MapGet("/ops/queue", (RabbitMqQueueStats stats) =>
-    {
-        var snap = stats.ReadPageQueue();
-        return Results.Ok(new
-        {
-            service = "Crawl.Worker",
-            queue = snap.Queue,
-            messagesReady = snap.MessagesReady,
-            consumerCount = snap.ConsumerCount,
-            dlqMessages = snap.DlqMessages,
-            suggestScaleOut = snap.SuggestScaleOut(),
-            suggestScaleIn = snap.SuggestScaleIn(),
-            healthy = snap.Healthy,
-            atUtc = snap.AtUtc
-        });
-    });
+    app.MapGet("/", () => Results.Ok(new { service = "Crawl.Worker", status = "ok", bus = "RabbitMQ" }));
 
     // Scale signal for local demos / operator probes (same shape as API /api/ops/queue).
     app.MapGet("/ops/queue", (RabbitMqQueueStats stats) =>

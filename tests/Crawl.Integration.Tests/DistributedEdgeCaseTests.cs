@@ -133,13 +133,17 @@ public class DistributedEdgeCaseTests
             Guid.NewGuid(),
             "Running",
             42,
-            TotalPages: 10,
+            Total: 10,
             Queued: 3,
             Processing: 1,
             Done: 5,
             Skipped: 1,
             Failed: 0,
-            DateTimeOffset.UtcNow);
+            StartedAt: null,
+            CompletedAt: null,
+            FailureReason: null,
+            EventKind: CrawlJobProgressEvent.KindPageProgress,
+            OccurredAt: DateTimeOffset.UtcNow);
 
         var json = System.Text.Json.JsonSerializer.Serialize(evt);
         Assert.DoesNotContain("<html", json, StringComparison.OrdinalIgnoreCase);
