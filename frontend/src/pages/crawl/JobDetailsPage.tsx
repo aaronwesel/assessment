@@ -101,8 +101,8 @@ export function JobDetailsPage() {
       title="Job details"
       lede={
         live
-          ? 'Live crawl — report and tree update as pages finish.'
-          : 'Crawl report, exports, Domain Link Ratio tree, and AI assist.'
+          ? 'Step 5 — watch the worker queue pages. Results, tree, exports, and element pick unlock when the job finishes.'
+          : 'Step 6 — crawl report, exports, Domain Link Ratio tree, element pick, and AI assist.'
       }
       wide
       actions={
@@ -135,34 +135,53 @@ export function JobDetailsPage() {
             <div className="crawl-details-primary">
           <JobSummary job={job} live={live} onCanceled={() => void loadJob()} />
 
-          <JobResultsHub job={job} root={root} terminal={terminal} />
+          {live ? (
+            <section
+              className="crawl-panel-block crawl-step5-running"
+              aria-labelledby="step5-running-heading"
+            >
+              <h2 id="step5-running-heading" className="crawl-section-title">
+                Crawl running
+              </h2>
+              <p className="hint">
+                Stay on this tab — step 6 opens automatically with the full report, page tree, DLR,
+                file exports, and element pick once the job reaches a finished state.
+              </p>
+            </section>
+          ) : null}
 
           <section className="crawl-panel-block crawl-ai-wrap" aria-label="Crawl incidents">
             <IncidentsPanel jobId={job.jobId} />
           </section>
 
-          <JobTreeSection
-            jobId={job.jobId}
-            live={live}
-            root={root}
-            loading={treeLoading}
-            error={treeError}
-            onRetry={() => void loadTree()}
-          />
+          {terminal ? (
+            <>
+              <JobResultsHub job={job} root={root} terminal={terminal} emphasizeExports />
 
-          {root ? <ElementPickExport jobId={job.jobId} root={root} /> : null}
-
-          {pages.length > 0 ? (
-            <section className="crawl-panel-block crawl-ai-wrap" aria-label="Assistive AI">
-              <AiAssistPanels
+              <JobTreeSection
                 jobId={job.jobId}
-                seedUrl={job.url}
-                status={job.status}
-                pages={pages}
-                pageCount={job.pageCounts.total}
-                edgeCount={pages.length}
+                live={false}
+                root={root}
+                loading={treeLoading}
+                error={treeError}
+                onRetry={() => void loadTree()}
               />
-            </section>
+
+              {root ? <ElementPickExport jobId={job.jobId} root={root} /> : null}
+
+              {pages.length > 0 ? (
+                <section className="crawl-panel-block crawl-ai-wrap" aria-label="Assistive AI">
+                  <AiAssistPanels
+                    jobId={job.jobId}
+                    seedUrl={job.url}
+                    status={job.status}
+                    pages={pages}
+                    pageCount={job.pageCounts.total}
+                    edgeCount={pages.length}
+                  />
+                </section>
+              ) : null}
+            </>
           ) : null}
             </div>
             <DeepSeekGuide

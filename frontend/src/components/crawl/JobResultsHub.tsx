@@ -20,9 +20,11 @@ type Props = {
   job: CrawlJob
   root: PageNode | null
   terminal: boolean
+  /** Step 6 guided crawl — surface export formats above the fold. */
+  emphasizeExports?: boolean
 }
 
-export function JobResultsHub({ job, root, terminal }: Props) {
+export function JobResultsHub({ job, root, terminal, emphasizeExports }: Props) {
   const navigate = useNavigate()
   const { isAuthenticated } = useAuth()
   const [pricing, setPricing] = useState<CrawlPricing | null>(null)
@@ -146,7 +148,13 @@ export function JobResultsHub({ job, root, terminal }: Props) {
           </div>
         ) : null}
 
-        <ReportActions job={job} report={report} navigate={navigate} isAuthenticated={isAuthenticated} />
+        <ReportActions
+          job={job}
+          report={report}
+          navigate={navigate}
+          isAuthenticated={isAuthenticated}
+          emphasizeExports={emphasizeExports}
+        />
       </MotionWrap>
     </section>
   )
@@ -179,59 +187,83 @@ function ReportActions({
   report,
   navigate,
   isAuthenticated,
+  emphasizeExports,
 }: {
   job: CrawlJob
   report: CrawlJobReport
   navigate: ReturnType<typeof useNavigate>
   isAuthenticated: boolean
+  emphasizeExports?: boolean
 }) {
   const hasExport = report.rows.length > 0
 
+  const exportButtons = (
+    <>
+      <button
+        type="button"
+        className="btn btn-primary"
+        disabled={!hasExport}
+        onClick={() => exportJobReport(report, 'csv')}
+      >
+        CSV
+      </button>
+      <button
+        type="button"
+        className="btn btn-ghost"
+        disabled={!hasExport}
+        onClick={() => exportJobReport(report, 'json')}
+      >
+        JSON
+      </button>
+      <button
+        type="button"
+        className="btn btn-ghost"
+        disabled={!hasExport}
+        onClick={() => exportJobReport(report, 'ndjson')}
+      >
+        NDJSON
+      </button>
+      <button
+        type="button"
+        className="btn btn-ghost"
+        disabled={!hasExport}
+        onClick={() => exportJobReport(report, 'md')}
+      >
+        Markdown
+      </button>
+      <button
+        type="button"
+        className="btn btn-ghost"
+        disabled={!hasExport}
+        onClick={() => exportJobReport(report, 'html')}
+      >
+        HTML
+      </button>
+    </>
+  )
+
   return (
     <div className="crawl-report-actions">
-      <div className="crawl-export-row">
-        <span className="hint">Export</span>
-        <button
-          type="button"
-          className="btn btn-ghost"
-          disabled={!hasExport}
-          onClick={() => exportJobReport(report, 'csv')}
-        >
-          CSV
-        </button>
-        <button
-          type="button"
-          className="btn btn-ghost"
-          disabled={!hasExport}
-          onClick={() => exportJobReport(report, 'json')}
-        >
-          JSON
-        </button>
-        <button
-          type="button"
-          className="btn btn-ghost"
-          disabled={!hasExport}
-          onClick={() => exportJobReport(report, 'ndjson')}
-        >
-          NDJSON
-        </button>
-        <button
-          type="button"
-          className="btn btn-ghost"
-          disabled={!hasExport}
-          onClick={() => exportJobReport(report, 'md')}
-        >
-          Markdown
-        </button>
-        <button
-          type="button"
-          className="btn btn-ghost"
-          disabled={!hasExport}
-          onClick={() => exportJobReport(report, 'html')}
-        >
-          HTML
-        </button>
-      </div>
+      {emphasizeExports ? (
+        <div className="crawl-step6-export-card" aria-labelledby="step6-export-heading">
+          <h3 id="step6-export-heading" className="crawl-step6-export-title">
+            Export crawl data
+          </h3>
+          <p className="hint crawl-step6-export-lede">
+            Download the page tree with Domain Link Ratio — client-side from values the .NET worker
+            stored.
+          </p>
+          <div className="crawl-step6-export-buttons">{exportButtons}</div>
+          {!hasExport ? (
+            <p className="hint">No parsed pages to export yet.</p>
+          ) : null}
+        </div>
+      ) : (
+        <div className="crawl-export-row">
+          <span className="hint">Export</span>
+          {exportButtons}
+        </div>
+      )}
 
       <div className="crawl-retry-row">
         <span className="hint">Retry</span>
