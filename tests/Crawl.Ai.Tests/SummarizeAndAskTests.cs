@@ -12,9 +12,9 @@ public class SummarizeAndAskTests
         var jobId = Guid.NewGuid();
         var pages = new[]
         {
-            new CrawlPageSnapshot(Guid.NewGuid(), "https://a.example/", 0, 0.9, "ok", null),
-            new CrawlPageSnapshot(Guid.NewGuid(), "https://a.example/low", 1, 0.1, "ok", null),
-            new CrawlPageSnapshot(Guid.NewGuid(), "https://a.example/err", 1, 0.5, "error", "timeout")
+            new CrawlPageSnapshot("1", "https://a.example/", 0, 0.9, "ok", null),
+            new CrawlPageSnapshot("2", "https://a.example/low", 1, 0.1, "ok", null),
+            new CrawlPageSnapshot("3", "https://a.example/err", 1, 0.5, "error", "timeout")
         };
 
         var resp = ResultSummarizer.LocalSummary(new SummarizeRequest(
@@ -30,7 +30,7 @@ public class SummarizeAndAskTests
         var svc = new ResultSummarizer(new FakeDeepSeek(false));
         var resp = await svc.SummarizeAsync(new SummarizeRequest(
             Guid.NewGuid(), "https://x", "Completed", 1, 0,
-            new[] { new CrawlPageSnapshot(Guid.NewGuid(), "https://x", 0, 1.0, "ok", null) },
+            new[] { new CrawlPageSnapshot("1", "https://x", 0, 1.0, "ok", null) },
             null));
         Assert.False(resp.UsedModel);
         Assert.NotNull(resp.DegradedReason);
@@ -41,8 +41,8 @@ public class SummarizeAndAskTests
     {
         var pages = new[]
         {
-            new CrawlPageSnapshot(Guid.NewGuid(), "https://a/high", 0, 0.8, "ok", null),
-            new CrawlPageSnapshot(Guid.NewGuid(), "https://a/low", 1, 0.15, "ok", null)
+            new CrawlPageSnapshot("1", "https://a/high", 0, 0.8, "ok", null),
+            new CrawlPageSnapshot("2", "https://a/low", 1, 0.15, "ok", null)
         };
 
         var resp = AskTheCrawlService.LocalAnswer(new AskTheCrawlRequest(

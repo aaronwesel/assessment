@@ -2,7 +2,7 @@
  * Client for Crawl.Ai overlay endpoints (hosted by Crawl.Api via MapCrawlAi).
  * Feature-flag aware; callers should hide panels when flags are off.
  */
-import { API_BASE_URL } from '../../config'
+import { config } from '../../config'
 
 export type AiFeatureFlags = {
   enabled: boolean
@@ -40,11 +40,9 @@ async function parseJson<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>
 }
 
-/** Crawl AI base — prefers dedicated crawl API when configured. */
+/** Crawl AI endpoints live on Crawl.Api (same host as jobs). */
 function crawlAiBase(): string {
-  const crawl = (import.meta as ImportMeta & { env: Record<string, string> }).env
-    .VITE_CRAWL_API_BASE_URL
-  return (crawl || API_BASE_URL || '').replace(/\/$/, '')
+  return config.crawlApiBaseUrl.replace(/\/$/, '')
 }
 
 export async function fetchAiFeatures(): Promise<AiFeatureFlags> {

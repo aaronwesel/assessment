@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Crawl.Ai;
 using Crawl.Api.Jobs;
 using Crawl.Infrastructure;
 using Crawl.Infrastructure.Messaging;
@@ -25,6 +26,8 @@ try
         .WriteTo.Console());
 
     builder.Services.AddCrawlInfrastructure(builder.Configuration);
+    // Assistive AI overlays — additive; never owns link parse / Domain Link Ratio.
+    builder.Services.AddCrawlAi(builder.Configuration);
     builder.Services.AddScoped<JobService>();
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(options =>
@@ -148,6 +151,8 @@ try
         })
         .WithName("CancelJob")
         .WithOpenApi();
+
+    app.MapCrawlAi();
 
     app.MapHealthChecks("/health");
     app.MapGet("/", () => Results.Redirect("/swagger"));

@@ -61,7 +61,8 @@ public sealed record LoginAssistConfirmResponse(
     string Message);
 
 public sealed record CrawlPageSnapshot(
-    Guid PageId,
+    /// <summary>Opaque page id from Crawl.Api (stringified); AI does not allocate crawl pages.</summary>
+    string PageId,
     string Url,
     int Depth,
     /// <summary>
@@ -93,7 +94,7 @@ public sealed record AskTheCrawlRequest(
     string Question,
     IReadOnlyList<CrawlPageSnapshot> Pages);
 
-public sealed record AskTheCrawlCitation(string Url, Guid? PageId, string Snippet);
+public sealed record AskTheCrawlCitation(string Url, string? PageId, string Snippet);
 
 public sealed record AskTheCrawlResponse(
     Guid JobId,

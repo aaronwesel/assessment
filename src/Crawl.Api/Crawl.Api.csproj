@@ -23,6 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Crawl.Ai\Crawl.Ai.csproj" />
     <ProjectReference Include="..\Crawl.Domain\Crawl.Domain.csproj" />
     <ProjectReference Include="..\Crawl.Infrastructure\Crawl.Infrastructure.csproj" />
   </ItemGroup>

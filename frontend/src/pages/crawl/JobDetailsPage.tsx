@@ -9,10 +9,13 @@ import {
   isActiveJobStatus,
   type CrawlJob,
   type JobTree,
+  type PageNode,
 } from '../../api/crawl'
 import { JobProgress } from '../../components/crawl/JobProgress'
 import { PageTree } from '../../components/crawl/PageTree'
 import { StatusBadge } from '../../components/crawl/StatusBadge'
+import { AiAssistPanels } from '../../crawl/ai/AiAssistPanels'
+import type { CrawlPageSnapshot } from '../../crawl/ai/crawlAiApi'
 import { formatDateTime } from '../../crawl/format'
 
 const POLL_MS = 1500
@@ -82,7 +85,9 @@ export function JobDetailsPage() {
       {job ? (
         <>
           <JobSummary job={job} onCanceled={() => void loadJob()} />
-          {job.status === 'Completed' ? <JobTreeSection jobId={job.jobId} /> : null}
+          {job.status === 'Completed' ? (
+            <JobTreeSection jobId={job.jobId} job={job} />
+          ) : null}
           {isActiveJobStatus(job.status) ? (
             <p className="hint crawl-poll-hint">Polling every {POLL_MS / 1000}s…</p>
           ) : null}
@@ -182,7 +187,23 @@ function JobSummary({
   )
 }
 
-function JobTreeSection({ jobId }: { jobId: string }) {
+function flattenPages(node: PageNode | null, acc: CrawlPageSnapshot[] = []): CrawlPageSnapshot[] {
+  if (!node) return acc
+  acc.push({
+    pageId: String(node.pageId),
+    url: node.url,
+    depth: node.depth,
+    domainLinkRatio: node.domainLinkRatio,
+    status: node.status,
+    error: node.error,
+  })
+  for (const child of node.children ?? []) {
+    flattenPages(child, acc)
+  }
+  return acc
+}
+
+function JobTreeSection({ jobId, job }: { jobId: string; job: CrawlJob }) {
   const [tree, setTree] = useState<JobTree | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -207,26 +228,42 @@ function JobTreeSection({ jobId }: { jobId: string }) {
     void load()
   }, [load])
 
+  const pages = flattenPages(tree?.root ?? null)
+
   return (
-    <section className="crawl-panel" aria-labelledby="tree-heading">
-      <h2 id="tree-heading" className="crawl-section-title">
-        Page tree
-      </h2>
-      {loading ? <p className="hint">Loading page tree…</p> : null}
-      {error ? (
-        <div role="alert">
-          <p className="form-error">{error}</p>
-          <button type="button" className="btn btn-ghost" onClick={() => void load()}>
-            Retry
-          </button>
-        </div>
+    <>
+      <section className="crawl-panel" aria-labelledby="tree-heading">
+        <h2 id="tree-heading" className="crawl-section-title">
+          Page tree
+        </h2>
+        {loading ? <p className="hint">Loading page tree…</p> : null}
+        {error ? (
+          <div role="alert">
+            <p className="form-error">{error}</p>
+            <button type="button" className="btn btn-ghost" onClick={() => void load()}>
+              Retry
+            </button>
+          </div>
+        ) : null}
+        {!loading && !error && tree?.root ? (
+          <PageTree jobId={jobId} root={tree.root} />
+        ) : null}
+        {!loading && !error && tree && !tree.root ? (
+          <p className="hint">No pages were crawled for this job.</p>
+        ) : null}
+      </section>
+      {!loading && !error ? (
+        <section className="crawl-panel" aria-label="Assistive AI">
+          <AiAssistPanels
+            jobId={jobId}
+            seedUrl={job.url}
+            status={job.status}
+            pages={pages}
+            pageCount={job.pageCounts.total}
+            edgeCount={pages.reduce((n, p) => n + (p.domainLinkRatio != null ? 1 : 0), 0)}
+          />
+        </section>
       ) : null}
-      {!loading && !error && tree?.root ? (
-        <PageTree jobId={jobId} root={tree.root} />
-      ) : null}
-      {!loading && !error && tree && !tree.root ? (
-        <p className="hint">No pages were crawled for this job.</p>
-      ) : null}
-    </section>
+    </>
   )
 }
