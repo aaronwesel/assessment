@@ -11,6 +11,13 @@ public sealed class RabbitMqOptions
     public string VirtualHost { get; set; } = "/";
     public string PageQueue { get; set; } = "crawl.page";
     public string PageDlq { get; set; } = "crawl.page.dlq";
+
+    /// <summary>Fanout exchange for job progress → API SignalR relay.</summary>
+    public string ProgressExchange { get; set; } = "crawl.job.events";
+
+    /// <summary>Exclusive/auto-delete queue prefix bound by each API instance for progress relay.</summary>
+    public string ProgressQueuePrefix { get; set; } = "crawl.job.events.api";
+
     public int PrefetchCount { get; set; } = 8;
     public int MaxRetryAttempts { get; set; } = 3;
 

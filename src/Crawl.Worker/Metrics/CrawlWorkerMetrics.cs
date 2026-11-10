@@ -31,6 +31,18 @@ public static class CrawlWorkerMetrics
         "crawl.messages.poison",
         description: "Messages routed to DLQ as poison / exhausted retries");
 
+    public static readonly Counter<long> PagesClaimed = Meter.CreateCounter<long>(
+        "crawl.pages.claimed",
+        description: "Successful Queued→Processing claims");
+
+    public static readonly Counter<long> PageReclaims = Meter.CreateCounter<long>(
+        "crawl.pages.reclaimed",
+        description: "Redelivered Processing pages reclaimed after worker crash");
+
+    public static readonly Counter<long> DuplicateMessagesSkipped = Meter.CreateCounter<long>(
+        "crawl.messages.duplicate_skipped",
+        description: "At-least-once duplicates skipped (terminal or owned by another worker)");
+
     public static readonly Histogram<double> FetchDurationMs = Meter.CreateHistogram<double>(
         "crawl.fetch.duration_ms",
         unit: "ms",
