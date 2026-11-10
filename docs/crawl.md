@@ -48,11 +48,9 @@ Vite/UI defaults to `VITE_CRAWL_API_URL=http://localhost:5059` for source runs; 
 | `GET` | `/api/jobs?page=&pageSize=` | History (newest first) |
 | `POST` | `/api/jobs/{jobId}/cancel` | Cancel in-flight job (`204`) |
 | `GET` | `/health` | Postgres + RabbitMQ checks |
-| `GET` | `/api/ops/queue` | Queue depth / consumer count / scale hints |
-| `GET` | `/api/ops/inflight` | Pages queued+processing + active jobs |
-| Hub | `/hubs/crawl-jobs` | SignalR: `SubscribeJob(jobId)` → `jobProgress` pushes |
+| SignalR | `/hubs/crawl-jobs` | `SubscribeJob` / `UnsubscribeJob` → `jobProgress` events (REST polling remains the fallback) |
 
-Worker also exposes `GET /ops/queue` (same depth snapshot) and `GET /health` so extra ECS tasks can join safely.
+Live progress fanout: workers publish to RabbitMQ exchange `crawl.job.events`; API `JobProgressRelayService` pushes to SignalR groups `job:{jobId}`.
 
 ## Message schema
 
@@ -74,8 +72,6 @@ Queue `crawl.page` (DLQ `crawl.page.dlq` via `crawl.page.dlx`):
 | `x-crawl-depth` | Depth mirror for ops |
 | AMQP `priority` | BFS-aware: shallower pages drain first (`x-max-priority=10`) |
 
-Progress fanout `crawl.job.events`: workers publish `CrawlJobProgressEvent`; each API instance binds an exclusive queue and relays to SignalR group `job:{jobId}`.
-
 If an older `crawl.page` queue was declared without `x-max-priority`, delete that queue once (or set `RabbitMq__EnableDepthPriority=false`) before restarting.
 
 ## Stretch — incident monitor (ops)
@@ -90,9 +86,8 @@ Not a Scrapy port — a .NET job crawler with the pieces that matter for correct
 |------------|----------|
 | URL canonicalization | Scheme/host lowercased (IDN→punycode), default ports stripped, fragment + user-info removed, empty path → `/`, **query params sorted** (configurable) |
 | Scheduling | Message-per-page; depth priority + stable URL order within depth (BFS-aware) |
-| Politeness | Per-host delay (`CrawlHttp:PolitenessDelayMilliseconds`, default 250ms) + optional Postgres advisory lock across workers (`DistributedHostPoliteness`) |
-| Concurrency | `MaxConcurrentFetches` per worker + RabbitMQ prefetch; multi-worker competing consumers |
-| Page claim | Atomic Queued→Processing; redelivered Processing reclaims after crash; duplicates skip (no double-count) |
+| Politeness | Per-host delay (`CrawlHttp:PolitenessDelayMilliseconds`, default 250ms) |
+| Concurrency | `MaxConcurrentFetches` per worker + RabbitMQ prefetch |
 | robots.txt | Configurable (`RespectRobotsTxt`, default on); honors Disallow/Allow longest-prefix + `Crawl-delay`; fail-open on fetch errors |
 | HTML-only | Content-Type check + byte sniff when type missing/generic; size cap |
 | Charset | `Content-Type` charset → `<meta charset>` → UTF-8 |
@@ -113,36 +108,17 @@ Not a Scrapy port — a .NET job crawler with the pieces that matter for correct
   "PolitenessDelayMilliseconds": 250,
   "RespectRobotsTxt": true,
   "MaxRedirects": 5,
-  "SortQueryParameters": true,
-  "DistributedHostPoliteness": true
+  "SortQueryParameters": true
 }
 ```
-
-## Elastic workers (queue-backed)
-
-Primary scale path for long/large jobs: **add `Crawl.Worker` consumers** on RabbitMQ (Compose replicas or ECS `desired_count` / ASG). Idempotent upserts + atomic page claims make joining safe.
-
-| Signal | Where |
-|--------|-------|
-| `messagesReady` / `consumerCount` / DLQ depth | `GET /api/ops/queue`, worker `GET /ops/queue` |
-| In-flight pages | `GET /api/ops/inflight` |
-| Cloud sketch | `infra/terraform/modules/crawl-ecs/autoscaling.tf` (App Auto Scaling + CW alarms; **no apply**) |
-
-Per-job ephemeral EC2 provision/handoff/delete remains stretch **next**, not the graded primary path.
-
-## SignalR realtime
-
-Job Details subscribes to `/hubs/crawl-jobs` for `jobProgress` (status, `%`, page counts). REST create/history/tree stay mandatory so the PDF flow works if WebSockets drop; UI falls back to polling automatically.
 
 ## Idempotency
 
 - Unique `(job_id, url)` on `crawl_pages`
 - Unique `(source_page_id, target_url)` on `crawl_edges`
 - Terminal page statuses are no-ops on redelivery
-- Atomic claim prevents multi-worker double-count / double Done
 - Child inserts tolerate unique races between workers
 - Canonical URLs (including sorted query) shrink duplicate fan-out before the DB unique indexes fire
-- Duplicate queue messages (at-least-once): MessageId `{jobId}:{pageId}` + claim/terminal short-circuit
 
 ## Domain Link Ratio
 
@@ -172,9 +148,9 @@ Still not a full Scrapy port (no JS render, no broad middleware ecosystem, no sp
 dotnet test Crawl.sln
 ```
 
-Domain: normalizer edge URLs, robots rules, depth priority, DLR, page-claim matrix, scale-signal heuristics.  
-Integration: HTML fixtures (incl. query/host/fragment edges), content sniff/charset, dedup stress + unique index shape, distributed edge cases (redirect loop, Crawl-delay, transient vs poison, progress payload hygiene).
+Domain: normalizer edge URLs, robots rules, depth priority, DLR.  
+Integration: HTML fixtures (incl. query/host/fragment edges), content sniff/charset, dedup stress + unique index shape.
 
 ## Observability
 
-Structured Serilog logs include `JobId` (no PHI/passwords). OpenTelemetry tracing hooks are registered; set `OTEL_EXPORTER_OTLP_ENDPOINT` to export. Worker meters: `crawl.pages.*`, `crawl.retries.transient`, `crawl.messages.poison`, `crawl.messages.duplicate_skipped`, `crawl.pages.claimed` / `reclaimed`, `crawl.fetch.duration_ms`.
+Structured Serilog logs include `JobId`. OpenTelemetry tracing hooks are registered; set `OTEL_EXPORTER_OTLP_ENDPOINT` to export. Worker meters: `crawl.pages.*`, `crawl.retries.transient`, `crawl.messages.poison`, `crawl.fetch.duration_ms`.

@@ -105,17 +105,12 @@ export function AiAssistPanels(props: Props) {
 }
 
 /** Exported for Job Details live view (stretch ops) without waiting for tree unlock. */
-export function IncidentsPanel({
-  jobId,
-  alertsEmailEnabled = false,
-}: {
-  jobId: string
-  alertsEmailEnabled?: boolean
-}) {
+export function IncidentsPanel({ jobId }: { jobId: string }) {
   const [latest, setLatest] = useState<IncidentRemediation | null>(null)
   const [items, setItems] = useState<IncidentRemediation[]>([])
   const [note, setNote] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [alertsEmailEnabled, setAlertsEmailEnabled] = useState(false)
 
   async function refresh() {
     setBusy(true)
@@ -137,10 +132,14 @@ export function IncidentsPanel({
     ;(async () => {
       setBusy(true)
       try {
-        const resp = await fetchJobIncidents(jobId)
+        const [resp, flags] = await Promise.all([
+          fetchJobIncidents(jobId),
+          fetchAiFeatures().catch(() => null),
+        ])
         if (cancelled) return
         setLatest(resp.latest)
         setItems(resp.incidents)
+        if (flags) setAlertsEmailEnabled(!!flags.alertsEmailEnabled)
         if (!resp.latest) setNote('No crawl incidents recorded for this job yet.')
       } catch (e) {
         if (!cancelled) setNote((e as Error).message)

@@ -15,6 +15,7 @@ namespace Crawl.Api.Jobs;
 public sealed class JobService(
     CrawlDbContext db,
     ICrawlMessagePublisher publisher,
+    IJobProgressPublisher progressPublisher,
     ILogger<JobService> logger)
 {
     public async Task<(CreateJobResponse? Response, string? Error)> CreateAsync(
@@ -43,6 +44,10 @@ public sealed class JobService(
 
         await publisher.PublishAsync(
             new CrawlPageRequested(job.Id, root.Id, root.Url, root.Depth, now),
+            cancellationToken);
+
+        await progressPublisher.PublishAsync(
+            CrawlJobProgressEvent.FromJobAndPages(job, [root], CrawlJobProgressEvent.KindCreated, now),
             cancellationToken);
 
         logger.LogInformation("Created crawl job {JobId} for {Url}", job.Id, job.Url);
@@ -135,8 +140,17 @@ public sealed class JobService(
         if (job.Status.IsTerminal())
             return (true, false, $"Job already {job.Status}.");
 
-        job.MarkCanceled(DateTimeOffset.UtcNow);
+        var now = DateTimeOffset.UtcNow;
+        job.MarkCanceled(now);
         await db.SaveChangesAsync(cancellationToken);
+
+        var pages = await db.Pages.AsNoTracking()
+            .Where(p => p.JobId == jobId)
+            .ToListAsync(cancellationToken);
+        await progressPublisher.PublishAsync(
+            CrawlJobProgressEvent.FromJobAndPages(job, pages, CrawlJobProgressEvent.KindCanceled, now),
+            cancellationToken);
+
         logger.LogInformation("Canceled crawl job {JobId}", jobId);
         return (true, true, null);
     }
