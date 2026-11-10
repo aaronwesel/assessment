@@ -16,6 +16,7 @@ export function PasswordForm() {
   const [password, setPassword] = useState('')
   const [totpCode, setTotpCode] = useState('')
   const [fullName, setFullName] = useState('')
+  const [healthcareAccount, setHealthcareAccount] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [mfaNeeded, setMfaNeeded] = useState(false)
@@ -42,6 +43,7 @@ export function PasswordForm() {
               email: trimmed,
               password,
               fullName: fullName.trim() || undefined,
+              healthcareAccount,
             })
           : await loginPassword({
               email: trimmed,
@@ -85,17 +87,28 @@ export function PasswordForm() {
       </div>
 
       {mode === 'register' ? (
-        <label className="field">
-          <span>Name</span>
-          <input
-            type="text"
-            name="full_name"
-            autoComplete="name"
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            placeholder="Optional"
-          />
-        </label>
+        <>
+          <label className="field">
+            <span>Name</span>
+            <input
+              type="text"
+              name="full_name"
+              autoComplete="name"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              placeholder="Optional"
+            />
+          </label>
+          <label className="field field-checkbox">
+            <input
+              type="checkbox"
+              name="healthcare_account"
+              checked={healthcareAccount}
+              onChange={(e) => setHealthcareAccount(e.target.checked)}
+            />
+            <span>Healthcare organization (MFA required)</span>
+          </label>
+        </>
       ) : null}
 
       <label className="field">

@@ -6,12 +6,14 @@ import { useState, type FormEvent } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { registerPassword } from '../api/auth'
 import { useAuth } from '../auth/AuthContext'
+import { AuthSocialStack } from '../components/AuthSocialStack'
 
 export function RegisterPage() {
   const { isAuthenticated, loginWithTokens } = useAuth()
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [healthcareAccount, setHealthcareAccount] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -41,6 +43,7 @@ export function RegisterPage() {
         email: trimmedEmail,
         password,
         fullName: fullName.trim() || undefined,
+        healthcareAccount,
       })
       await loginWithTokens(tokens, 'password')
     } catch (err) {
@@ -54,9 +57,13 @@ export function RegisterPage() {
     <main className="page register-page">
       <h1>Create account</h1>
       <p className="lede">
-        Self-serve signup against the existing password register API. Already
-        have an account? <Link to="/login">Sign in</Link>.
+        Use Google, Microsoft, or email. Already have an account?{' '}
+        <Link to="/login">Sign in</Link>.
       </p>
+
+      <div className="auth-stack">
+        <AuthSocialStack dividerLabel="or register with email" />
+      </div>
 
       <form className="password-form" onSubmit={onSubmit} noValidate>
         <label className="field">
@@ -93,6 +100,17 @@ export function RegisterPage() {
             placeholder="At least 12 characters"
             required
           />
+        </label>
+        <label className="field field-checkbox">
+          <input
+            type="checkbox"
+            name="healthcare_account"
+            checked={healthcareAccount}
+            onChange={(e) => setHealthcareAccount(e.target.checked)}
+          />
+          <span>
+            Healthcare / HIPAA-minded organization (MFA required before using the app)
+          </span>
         </label>
         {error ? <p className="form-error">{error}</p> : null}
         <button type="submit" className="btn btn-primary" disabled={busy}>

@@ -19,6 +19,8 @@ export type AuthUser = {
   name: string
   roles: string[]
   provider: AuthProvider
+  mfaEnabled?: boolean
+  mfaPolicyRequired?: boolean
 }
 
 export type AuthContextValue = {

@@ -316,6 +316,54 @@ code {
   border-radius: var(--radius);
 }
 
+.mfa-qr {
+  display: block;
+  margin: 0.5rem 0;
+  border-radius: var(--radius);
+  background: #fff;
+  padding: 0.5rem;
+}
+
+.mfa-manual-entry {
+  margin-top: 0.75rem;
+}
+
+.mfa-manual-entry summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.mfa-onboarding {
+  margin: 1.25rem 0;
+  padding: 1rem 1.1rem;
+  border-radius: var(--radius);
+  background: var(--bg-accent);
+  border: 1px solid var(--line);
+}
+
+.mfa-onboarding-required {
+  border-color: var(--warn, #e8a317);
+}
+
+.mfa-onboarding h2 {
+  font-family: var(--display);
+  font-size: 1.2rem;
+  margin: 0 0 0.5rem;
+}
+
+.field-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  font-size: 0.92rem;
+  line-height: 1.35;
+}
+
+.field-checkbox input {
+  margin-top: 0.2rem;
+}
+
 /* —— Public landing —— */
 .landing {
   flex: 1;

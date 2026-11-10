@@ -56,6 +56,8 @@ class PasswordRegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=MIN_PASSWORD_LENGTH, max_length=MAX_PASSWORD_LENGTH)
     full_name: str | None = Field(default=None, max_length=255)
+    # Healthcare / HIPAA-minded orgs must complete MFA enrollment (policy flag only).
+    healthcare_account: bool = False
 
 
 class PasswordLoginRequest(BaseModel):
@@ -88,6 +90,7 @@ class ProtectedPingResponse(BaseModel):
     email: str | None = None
     full_name: str | None = None
     mfa_enabled: bool = False
+    mfa_policy_required: bool = False
     message: str = "ok"
 
 
@@ -127,6 +130,7 @@ class MfaVerifyResponse(BaseModel):
 
 class MfaStatusResponse(BaseModel):
     mfa_enabled: bool
+    mfa_policy_required: bool = False
 
 
 def _issue_tokens(subject: str, roles: list[str]) -> TokenPair:
@@ -161,6 +165,7 @@ def register_password(body: PasswordRegisterRequest, session: SessionDep) -> Tok
             email=body.email,
             password=body.password,
             full_name=body.full_name,
+            mfa_policy_required=body.healthcare_account,
         )
     except ValueError as exc:
         detail = str(exc)
@@ -338,7 +343,10 @@ def mfa_status(
     user = user_service.get_user_by_id(session, auth.subject)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    return MfaStatusResponse(mfa_enabled=bool(user.mfa_enabled))
+    return MfaStatusResponse(
+        mfa_enabled=bool(user.mfa_enabled),
+        mfa_policy_required=bool(user.mfa_policy_required),
+    )
 
 
 @router.post("/mfa/enroll", response_model=MfaEnrollResponse)
@@ -446,6 +454,7 @@ def auth_me(
         email=user.email if user else None,
         full_name=user.full_name if user else None,
         mfa_enabled=bool(user.mfa_enabled) if user else False,
+        mfa_policy_required=bool(user.mfa_policy_required) if user else False,
     )
 
 

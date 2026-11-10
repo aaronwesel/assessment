@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { MfaOnboardingBanner } from '../components/MfaOnboardingBanner'
 import { MfaPanel } from '../components/MfaPanel'
 import { useAuth } from '../auth/AuthContext'
 
@@ -30,6 +31,7 @@ export function HomePage() {
           Platform admin: open the <Link to="/superadmin">superadmin console</Link>.
         </p>
       ) : null}
+      <MfaOnboardingBanner />
       <MfaPanel />
       <p className="hint">
         Open the <Link to="/crawl">crawl console</Link> to start a job or view{' '}

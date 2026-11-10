@@ -6,6 +6,7 @@ JWT `sub` is the opaque `id` UUID — prefer that over email in tokens and logs.
 
 MFA columns:
 - `mfa_enabled` — when True, password login requires a valid TOTP / backup code.
+- `mfa_policy_required` — healthcare (and similar) accounts must enroll MFA before full app use.
 - `mfa_secret_encrypted` — Fernet ciphertext of the base32 TOTP seed (never plaintext).
 - `mfa_backup_codes_hashed` — JSON array of bcrypt hashes; plaintext codes shown once.
 
@@ -39,6 +40,7 @@ class User(SQLModel, table=True):
 
     # MFA (TOTP). Secrets encrypted at rest; backup codes hashed.
     mfa_enabled: bool = Field(default=False)
+    mfa_policy_required: bool = Field(default=False)
     mfa_secret_encrypted: Optional[str] = Field(default=None, max_length=512)
     mfa_backup_codes_hashed: Optional[str] = Field(
         default=None,

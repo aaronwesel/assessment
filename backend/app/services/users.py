@@ -66,6 +66,7 @@ def create_password_user(
     email: str,
     password: str,
     full_name: str | None = None,
+    mfa_policy_required: bool = False,
 ) -> User:
     """Register a local password user; raises ValueError if email already exists."""
     normalized = email.lower().strip()
@@ -85,6 +86,7 @@ def create_password_user(
         role=UserRole.USER,
         is_active=True,
         mfa_enabled=False,
+        mfa_policy_required=bool(mfa_policy_required),
     )
     session.add(user)
     session.flush()
