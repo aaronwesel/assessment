@@ -106,3 +106,36 @@ def create_portal_session(*, customer_id: str, return_url: str) -> Any:
 def retrieve_subscription(subscription_id: str) -> Any:
     client = get_stripe_client()
     return client.v1.subscriptions.retrieve(subscription_id)
+
+
+def metered_billing_configured(settings: Settings | None = None) -> bool:
+    cfg = settings or get_settings()
+    key = (cfg.stripe_secret_key or "").strip()
+    metered = (cfg.stripe_metered_price_id or "").strip()
+    event_name = (cfg.stripe_meter_event_name or "").strip()
+    return bool(key and metered and event_name)
+
+
+def create_meter_event(
+    *,
+    event_name: str,
+    stripe_customer_id: str,
+    value: int,
+    idempotency_key: str | None = None,
+) -> Any:
+    """Send a Billing Meter event (Stripe test mode). Value is total billable pages for this job."""
+    if value <= 0:
+        raise ValueError("value must be positive")
+    if not metered_billing_configured():
+        raise StripeNotConfiguredError("Stripe metered billing is not configured")
+    client = get_stripe_client()
+    params: dict[str, Any] = {
+        "event_name": event_name.strip(),
+        "payload": {
+            "stripe_customer_id": stripe_customer_id,
+            "value": str(value),
+        },
+    }
+    if idempotency_key:
+        params["identifier"] = idempotency_key
+    return client.v1.billing.meter_events.create(params=params)
