@@ -1,6 +1,8 @@
 /**
  * Wizard-only advanced options (API accepts depth + maxPages; rest are operator notes / UI prefs).
  */
+import { DEFAULT_MAX_PAGES } from './crawlLimits'
+
 export type SelectorMode = 'css' | 'xpath'
 
 export type CrawlAdvancedOptions = {
@@ -15,7 +17,7 @@ export type CrawlAdvancedOptions = {
 
 export const DEFAULT_ADVANCED: CrawlAdvancedOptions = {
   maxDepth: 2,
-  maxPages: 200,
+  maxPages: DEFAULT_MAX_PAGES,
   politenessNote: 'Default worker delay (~1s/host) — increase if the site rate-limits you.',
   honorRobots: true,
   credentialVaultRef: '',

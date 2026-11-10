@@ -6,6 +6,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   crawlApi,
   CrawlApiError,
+  isActiveJobStatus,
   type JobSummary,
   type PagedResult,
 } from '../../api/crawl'
@@ -19,6 +20,7 @@ import { StatusBadge } from '../../components/crawl/StatusBadge'
 import { formatDateTime } from '../../crawl/format'
 
 const PAGE_SIZE = 20
+const HISTORY_ACTIVE_POLL_MS = 4000
 
 export function HistoryPage() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -27,25 +29,39 @@ export function HistoryPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const load = useCallback(async () => {
-    await Promise.resolve()
-    setLoading(true)
-    setError(null)
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) {
+      setLoading(true)
+      setError(null)
+    }
     try {
       setData(await crawlApi.getJobs(page, PAGE_SIZE))
+      if (!opts?.silent) setError(null)
     } catch (err) {
-      setData(null)
-      setError(
-        err instanceof CrawlApiError ? err.message : 'Failed to load history.',
-      )
+      if (!opts?.silent) {
+        setData(null)
+        setError(
+          err instanceof CrawlApiError ? err.message : 'Failed to load history.',
+        )
+      }
     } finally {
-      setLoading(false)
+      if (!opts?.silent) setLoading(false)
     }
   }, [page])
 
   useEffect(() => {
     void load()
   }, [load])
+
+  const hasActiveJobs = Boolean(data?.items.some((j) => isActiveJobStatus(j.status)))
+
+  useEffect(() => {
+    if (!hasActiveJobs || error) return undefined
+    const timer = window.setInterval(() => {
+      void load({ silent: true })
+    }, HISTORY_ACTIVE_POLL_MS)
+    return () => window.clearInterval(timer)
+  }, [hasActiveJobs, error, load])
 
   const goToPage = (next: number) => setSearchParams({ page: String(next) })
   const totalPages = data
@@ -55,7 +71,7 @@ export function HistoryPage() {
   return (
     <CrawlShell
       title="Crawl history"
-      lede="Recent jobs, newest first. Open any row to inspect progress, the page tree, and Domain Link Ratio."
+      lede="Recent jobs, newest first. In-flight crawls keep running server-side — rows refresh until they complete."
       wide
       actions={
         <Link className="btn btn-primary" to="/crawl">

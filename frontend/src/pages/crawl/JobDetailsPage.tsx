@@ -116,7 +116,7 @@ export function JobDetailsPage() {
       title="Job details"
       lede={
         live
-          ? 'Live crawl — status and Domain Link Ratio update as pages finish.'
+          ? 'Live crawl — workers keep running if you leave this page. Reopen from History anytime.'
           : 'Crawl report, exports, Domain Link Ratio tree, and AI assist.'
       }
       wide
@@ -202,11 +202,11 @@ function realtimeHint(mode: RealtimeMode, live: boolean): string {
   if (!live) return ''
   switch (mode) {
     case 'live':
-      return 'Live via SignalR'
+      return 'Live via SignalR (disconnect only pauses this view)'
     case 'connecting':
       return 'Connecting realtime…'
     case 'polling':
-      return 'Polling (SignalR unavailable)'
+      return 'Polling REST (job still runs server-side)'
     default:
       return ''
   }
@@ -296,6 +296,14 @@ function JobSummary({
         live={live}
       />
 
+      {live ? (
+        <p className="crawl-background-hint hint" role="status">
+          Workers run on RabbitMQ until this job completes or you press <strong>Cancel job</strong>. Navigating to{' '}
+          <Link to="/crawl/history">History</Link> or starting another crawl does not stop this run — reopen this job for
+          live status.
+        </p>
+      ) : null}
+
       <div className="crawl-summary-actions">
         {live ? (
           <button
@@ -365,7 +373,7 @@ function JobTreeSection({
       {!loading && !error && !root ? (
         <CrawlEmpty title="No pages in tree yet" actionTo="/crawl/welcome" actionLabel="Try wizard">
           {live
-            ? 'The worker is still fetching the seed page — keep this tab open.'
+            ? 'The worker is still fetching the seed page. Browse away freely — reopen this job from History for live updates.'
             : 'The job finished without a crawlable root page. Use the crawl report above for diagnosis.'}
         </CrawlEmpty>
       ) : null}
