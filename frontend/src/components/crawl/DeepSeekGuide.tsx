@@ -149,6 +149,8 @@ function friendlyStepCopy(step: number): string {
     'We will fetch the seed from the server (not your browser) and tell you if it looks reachable.',
     'Depth controls how many link hops we follow; max pages caps cost and queue size.',
     'Review pricing, then enqueue the job on RabbitMQ.',
+    'Watch queue depth and page counts here — exports and element pick unlock on step 6.',
+    'Download CSV/JSON, explore the tree and DLR, then use element pick for CSS/XPath field export.',
   ]
   return copy[step] ?? copy[0]
 }
