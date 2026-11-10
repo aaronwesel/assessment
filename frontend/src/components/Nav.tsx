@@ -19,6 +19,12 @@ export function Nav() {
         Assessment
       </Link>
       <div className="nav-actions">
+        <Link className="nav-link" to="/crawl">
+          Crawl
+        </Link>
+        <Link className="nav-link" to="/crawl/history">
+          History
+        </Link>
         {isAuthenticated ? (
           <>
             <Link className="nav-link" to="/app">

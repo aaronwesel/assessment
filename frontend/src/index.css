@@ -763,3 +763,248 @@ code {
   border-color: color-mix(in srgb, var(--primary) 35%, var(--line));
   background: color-mix(in srgb, var(--primary) 8%, white);
 }
+
+/* —— Crawl console —— */
+.crawl-page {
+  width: min(560px, calc(100% - 2rem));
+}
+
+.crawl-page-wide {
+  width: min(920px, calc(100% - 2rem));
+}
+
+.crawl-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.35rem;
+}
+
+.crawl-header h1 {
+  margin-bottom: 0;
+}
+
+.crawl-header-links {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.crawl-panel {
+  margin: 0 0 1.5rem;
+  padding: 1rem 0 0;
+  border-top: 1px solid var(--line);
+}
+
+.crawl-section-title {
+  font-family: var(--display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0 0 0.85rem;
+}
+
+.crawl-meta {
+  margin-bottom: 1rem;
+}
+
+.crawl-progress {
+  margin: 0.75rem 0 1rem;
+}
+
+.crawl-progress-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-size: 0.925rem;
+}
+
+.crawl-progress progress {
+  width: 100%;
+  height: 0.65rem;
+  accent-color: var(--primary);
+}
+
+.crawl-poll-hint {
+  margin-top: 0.5rem;
+}
+
+.crawl-badge {
+  display: inline-block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  background: var(--bg-accent);
+  color: var(--ink);
+  text-transform: capitalize;
+}
+
+.crawl-badge-pending,
+.crawl-badge-queued {
+  border-color: color-mix(in srgb, #8a6d3b 40%, var(--line));
+  background: color-mix(in srgb, #8a6d3b 12%, white);
+}
+
+.crawl-badge-running {
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--line));
+  background: color-mix(in srgb, var(--primary) 12%, white);
+}
+
+.crawl-badge-completed,
+.crawl-badge-done {
+  border-color: color-mix(in srgb, #2f6b4f 40%, var(--line));
+  background: color-mix(in srgb, #2f6b4f 12%, white);
+}
+
+.crawl-badge-failed {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--line));
+  background: color-mix(in srgb, var(--danger) 10%, white);
+  color: var(--danger);
+}
+
+.crawl-badge-canceled,
+.crawl-badge-skipped {
+  color: var(--muted);
+}
+
+.crawl-table-wrap {
+  overflow-x: auto;
+  margin: 1rem 0;
+}
+
+.crawl-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.925rem;
+}
+
+.crawl-table th,
+.crawl-table td {
+  text-align: left;
+  padding: 0.65rem 0.5rem;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+.crawl-table th {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.crawl-table-row {
+  cursor: pointer;
+}
+
+.crawl-table-row:hover {
+  background: color-mix(in srgb, var(--bg-accent) 70%, white);
+}
+
+.crawl-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin: 1rem 0 2rem;
+}
+
+.crawl-tree {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 0.35rem;
+}
+
+.crawl-tree .crawl-tree {
+  margin-left: 0.85rem;
+  padding-left: 0.75rem;
+  border-left: 1px solid var(--line);
+}
+
+.crawl-tree-node {
+  margin: 0.35rem 0;
+}
+
+.crawl-tree-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.65rem;
+}
+
+.crawl-toggle {
+  width: 1.5rem;
+  flex: 0 0 auto;
+  font: inherit;
+  line-height: 1;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 0;
+}
+
+.crawl-tree-url {
+  word-break: break-all;
+  color: var(--primary);
+}
+
+.crawl-tree-url:hover {
+  text-decoration: underline;
+}
+
+.crawl-link-toggle {
+  font-size: 0.85rem;
+  padding: 0.2rem 0.45rem;
+}
+
+.crawl-tree-links {
+  margin: 0.35rem 0 0.5rem 1.5rem;
+}
+
+.crawl-links {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+}
+
+.crawl-tag {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+  border: 1px solid var(--line);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.crawl-tag-internal {
+  border-color: color-mix(in srgb, var(--primary) 35%, var(--line));
+  color: var(--primary);
+}
+
+.crawl-tag-external {
+  color: var(--muted);
+}
+
+.crawl-inline-error {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+@media (max-width: 640px) {
+  .crawl-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

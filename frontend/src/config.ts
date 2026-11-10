@@ -10,6 +10,8 @@ export const config = {
   microsoftClientId: import.meta.env.VITE_MICROSOFT_CLIENT_ID ?? '',
   microsoftTenantId: import.meta.env.VITE_MICROSOFT_TENANT_ID ?? 'common',
   apiBaseUrl: import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000',
+  /** Crawl.Api (.NET) — separate from FastAPI platform auth base. */
+  crawlApiBaseUrl: import.meta.env.VITE_CRAWL_API_URL ?? 'http://localhost:5080',
   /** Optional pk_test_ hint; billing page also loads publishable key from the API. */
   stripePublishableKey: import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? '',
 } as const
