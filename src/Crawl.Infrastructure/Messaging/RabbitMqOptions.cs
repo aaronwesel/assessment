@@ -13,4 +13,12 @@ public sealed class RabbitMqOptions
     public string PageDlq { get; set; } = "crawl.page.dlq";
     public int PrefetchCount { get; set; } = 8;
     public int MaxRetryAttempts { get; set; } = 3;
+
+    /// <summary>
+    /// Declare crawl.page with x-max-priority and publish depth-based priorities (BFS-aware).
+    /// If an older queue exists without this arg, delete it once or set false.
+    /// </summary>
+    public bool EnableDepthPriority { get; set; } = true;
+
+    public byte MaxDepthPriority { get; set; } = 10;
 }

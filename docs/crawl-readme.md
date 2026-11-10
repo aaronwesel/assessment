@@ -123,6 +123,7 @@ Operator: inspect DLQ in RabbitMQ management UI; replay is deliberate (not auto)
 - Polling UI (SignalR/SSE cut from 4h path).
 - Per-job write serialization may cap huge single-job throughput (fine at 200 pages).
 - Auth optional locally; cloud UI expects platform auth.
+- robots.txt / politeness / redirect-loop guards / query-sort dedup are **on** (see [crawl.md](crawl.md)); still not a Scrapy port.
 
 ---
 
@@ -141,7 +142,7 @@ Operator: inspect DLQ in RabbitMQ management UI; replay is deliberate (not auto)
 - SignalR / SSE live push  
 - Full Terraform **apply** / real AWS cutover  
 - Salesforce live webhook, Rekognition screenshots  
-- Strong SSRF / robots / politeness  
+- Strong SSRF allowlist (robots / politeness shipped in worker) 
 
 **Next**
 

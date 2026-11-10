@@ -1,7 +1,9 @@
 using System.Text;
 using System.Text.Json;
+using Crawl.Domain.Fetching;
 using Crawl.Domain.Messaging;
 using Crawl.Infrastructure.Messaging;
+using Crawl.Worker.Metrics;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
@@ -22,13 +24,18 @@ public sealed class CrawlPageConsumer(
     protected override Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _channel = connectionFactory.CreateChannel();
+        // Prefetch bounds in-flight messages; MaxConcurrentFetches further caps HTTP.
         _channel.BasicQos(0, (ushort)Math.Max(1, options.Value.PrefetchCount), false);
 
         _consumer = new AsyncEventingBasicConsumer(_channel);
         _consumer.Received += OnReceivedAsync;
         _channel.BasicConsume(options.Value.PageQueue, autoAck: false, _consumer);
 
-        logger.LogInformation("Listening on queue {Queue}", options.Value.PageQueue);
+        logger.LogInformation(
+            "Listening on queue {Queue} (prefetch={Prefetch}, depthPriority={DepthPriority})",
+            options.Value.PageQueue,
+            options.Value.PrefetchCount,
+            options.Value.EnableDepthPriority);
 
         stoppingToken.Register(() =>
         {
@@ -59,6 +66,7 @@ public sealed class CrawlPageConsumer(
             if (message is null)
             {
                 logger.LogError("Poison message: null payload; sending to DLQ");
+                CrawlWorkerMetrics.PoisonMessages.Add(1);
                 channel.BasicNack(args.DeliveryTag, multiple: false, requeue: false);
                 return;
             }
@@ -82,10 +90,12 @@ public sealed class CrawlPageConsumer(
                     retryCount,
                     message?.JobId,
                     message?.PageId);
+                CrawlWorkerMetrics.PoisonMessages.Add(1);
                 channel.BasicNack(args.DeliveryTag, multiple: false, requeue: false);
                 return;
             }
 
+            CrawlWorkerMetrics.TransientRetries.Add(1);
             logger.LogWarning(
                 ex,
                 "Transient failure retry {RetryCount}/{MaxRetries} JobId={JobId} PageId={PageId}",
@@ -99,6 +109,7 @@ public sealed class CrawlPageConsumer(
             props.Persistent = true;
             props.ContentType = "application/json";
             props.MessageId = args.BasicProperties.MessageId;
+            props.Priority = args.BasicProperties.Priority;
             props.Headers = new Dictionary<string, object>(
                 args.BasicProperties.Headers?.ToDictionary(k => k.Key, v => v.Value)
                 ?? new Dictionary<string, object>())
@@ -113,9 +124,10 @@ public sealed class CrawlPageConsumer(
         {
             logger.LogError(
                 ex,
-                "Non-transient failure for JobId={JobId} PageId={PageId}; routing to DLQ",
+                "Poison/non-transient failure for JobId={JobId} PageId={PageId}; routing to DLQ",
                 message?.JobId,
                 message?.PageId);
+            CrawlWorkerMetrics.PoisonMessages.Add(1);
             channel.BasicNack(args.DeliveryTag, multiple: false, requeue: false);
         }
     }
@@ -136,11 +148,13 @@ public sealed class CrawlPageConsumer(
     }
 
     private static bool IsTransient(Exception ex) =>
-        ex is HttpRequestException
+        ex is TransientCrawlException
+            or HttpRequestException
             or TaskCanceledException
             or TimeoutException
             or IOException
-            or BrokerUnreachableException;
+            or BrokerUnreachableException
+            || ex.InnerException is TransientCrawlException or HttpRequestException or TaskCanceledException;
 
     public override void Dispose()
     {

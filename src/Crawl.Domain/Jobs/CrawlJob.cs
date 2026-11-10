@@ -100,7 +100,7 @@ public class CrawlJob
         {
             Id = Guid.NewGuid(),
             Url = normalized.AbsoluteUri,
-            StartHost = normalized.Host.ToLowerInvariant(),
+            StartHost = normalized.IdnHost.ToLowerInvariant(),
             MaxDepth = maxDepth,
             MaxPages = maxPages,
             Status = CrawlJobStatus.Pending,

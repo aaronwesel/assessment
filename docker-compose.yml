@@ -178,6 +178,12 @@ services:
       RabbitMq__PageQueue: ${CRAWL_QUEUE:-crawl.page}
       RabbitMq__PageDlq: ${CRAWL_DLQ:-crawl.page.dlq}
       CrawlHttp__TimeoutSeconds: ${CRAWL_HTTP_TIMEOUT_SECONDS:-15}
+      CrawlHttp__MaxConcurrentFetches: ${CRAWL_MAX_CONCURRENT_FETCHES:-4}
+      CrawlHttp__PolitenessDelayMilliseconds: ${CRAWL_POLITENESS_DELAY_MS:-250}
+      CrawlHttp__RespectRobotsTxt: ${CRAWL_RESPECT_ROBOTS:-true}
+      CrawlHttp__MaxRedirects: ${CRAWL_MAX_REDIRECTS:-5}
+      CrawlHttp__SortQueryParameters: ${CRAWL_SORT_QUERY:-true}
+      RabbitMq__EnableDepthPriority: ${CRAWL_DEPTH_PRIORITY:-true}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
       OTEL_SERVICE_NAME: crawl-worker
     depends_on:

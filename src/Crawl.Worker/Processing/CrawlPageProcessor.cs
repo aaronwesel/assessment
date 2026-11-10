@@ -1,12 +1,16 @@
+using Crawl.Domain.Fetching;
 using Crawl.Domain.Jobs;
 using Crawl.Domain.Links;
 using Crawl.Domain.Messaging;
 using Crawl.Domain.Pages;
 using Crawl.Infrastructure.Html;
+using Crawl.Infrastructure.Http;
 using Crawl.Infrastructure.Messaging;
 using Crawl.Infrastructure.Persistence;
 using Crawl.Worker.Fetching;
+using Crawl.Worker.Metrics;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Npgsql;
 
 namespace Crawl.Worker.Processing;
@@ -16,6 +20,7 @@ public sealed class CrawlPageProcessor(
     HtmlPageFetcher fetcher,
     HtmlLinkExtractor linkExtractor,
     ICrawlMessagePublisher publisher,
+    IOptions<CrawlHttpOptions> httpOptions,
     ILogger<CrawlPageProcessor> logger)
 {
     public async Task ProcessAsync(CrawlPageRequested message, CancellationToken cancellationToken)
@@ -23,7 +28,8 @@ public sealed class CrawlPageProcessor(
         using var _ = logger.BeginScope(new Dictionary<string, object>
         {
             ["JobId"] = message.JobId,
-            ["PageId"] = message.PageId
+            ["PageId"] = message.PageId,
+            ["Depth"] = message.Depth
         });
 
         var job = await db.Jobs.FirstOrDefaultAsync(j => j.Id == message.JobId, cancellationToken);
@@ -61,9 +67,16 @@ public sealed class CrawlPageProcessor(
         page.MarkProcessing();
         await db.SaveChangesAsync(cancellationToken);
 
-        if (!UrlNormalizer.TryNormalize(page.Url, out var pageUri))
+        var normalizeOptions = new UrlNormalizationOptions
+        {
+            SortQueryParameters = httpOptions.Value.SortQueryParameters,
+            MaxUrlLength = CrawlJob.UrlMaxLength
+        };
+
+        if (!UrlNormalizer.TryNormalize(page.Url, baseUri: null, normalizeOptions, out var pageUri))
         {
             page.MarkFailed("Invalid page URL.", DateTimeOffset.UtcNow);
+            CrawlWorkerMetrics.PagesFailed.Add(1);
             await FinalizeAsync(job, cancellationToken);
             return;
         }
@@ -73,16 +86,21 @@ public sealed class CrawlPageProcessor(
         {
             fetch = await fetcher.FetchAsync(pageUri, cancellationToken);
         }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        catch (TransientCrawlException)
         {
             // Let the consumer retry / DLQ for transient HTTP failures.
             throw;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException)
+        {
+            throw new TransientCrawlException($"Transient error fetching {pageUri}", ex);
         }
 
         var now = DateTimeOffset.UtcNow;
         if (fetch.Skipped)
         {
             page.MarkSkipped(fetch.Error ?? "Skipped", now);
+            CrawlWorkerMetrics.PagesSkipped.Add(1);
             await FinalizeAsync(job, cancellationToken);
             return;
         }
@@ -90,11 +108,13 @@ public sealed class CrawlPageProcessor(
         if (!fetch.Success || fetch.Html is null)
         {
             page.MarkFailed(fetch.Error ?? "Fetch failed", now);
+            CrawlWorkerMetrics.PagesFailed.Add(1);
             await FinalizeAsync(job, cancellationToken);
             return;
         }
 
-        var links = linkExtractor.Extract(fetch.Html, pageUri);
+        var parseBase = fetch.FinalUrl ?? pageUri;
+        var links = linkExtractor.Extract(fetch.Html, parseBase, normalizeOptions);
         var startHost = job.StartHost;
         var internalCount = 0;
         var edges = new List<PageEdge>();
@@ -102,7 +122,7 @@ public sealed class CrawlPageProcessor(
 
         foreach (var link in links)
         {
-            var isInternal = string.Equals(link.Host, startHost, StringComparison.OrdinalIgnoreCase);
+            var isInternal = string.Equals(link.IdnHost, startHost, StringComparison.OrdinalIgnoreCase);
             if (isInternal)
             {
                 internalCount++;
@@ -118,11 +138,16 @@ public sealed class CrawlPageProcessor(
         db.Edges.AddRange(edges);
 
         page.MarkDone(links.Count, internalCount, now);
+        CrawlWorkerMetrics.PagesProcessed.Add(1);
         await db.SaveChangesAsync(cancellationToken);
 
         var childMessages = new List<CrawlPageRequested>();
         if (job.CanEnqueueChildrenOf(page.Depth) && job.Status != CrawlJobStatus.Canceled)
         {
+            // Stable BFS fan-out: lexicographic URL order within the next depth.
+            childCandidates = childCandidates
+                .OrderBy(u => u.AbsoluteUri, StringComparer.Ordinal)
+                .ToList();
             childMessages = await EnqueueChildrenAsync(job, page, childCandidates, now, cancellationToken);
         }
 
@@ -132,10 +157,11 @@ public sealed class CrawlPageProcessor(
             await publisher.PublishAsync(childMessage, cancellationToken);
 
         logger.LogInformation(
-            "Processed page {PageId} links={LinkCount} internal={InternalCount} children={Children}",
+            "Processed page {PageId} links={LinkCount} internal={InternalCount} ratio={Ratio} children={Children}",
             page.Id,
             page.LinkCount,
             page.InternalLinkCount,
+            page.DomainLinkRatioValue,
             childMessages.Count);
     }
 
@@ -189,6 +215,7 @@ public sealed class CrawlPageProcessor(
             // Best-effort: only publish pages that actually exist and are still queued under this parent.
             var queuedChildren = await db.Pages.AsNoTracking()
                 .Where(p => p.JobId == job.Id && p.ParentPageId == parent.Id && p.Status == CrawlPageStatus.Queued)
+                .OrderBy(p => p.Url)
                 .ToListAsync(cancellationToken);
 
             return queuedChildren

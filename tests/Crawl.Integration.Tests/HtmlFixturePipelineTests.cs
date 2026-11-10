@@ -58,4 +58,20 @@ public class HtmlFixturePipelineTests
         Assert.True(UrlNormalizer.TryNormalize("/a#2", baseUri, out var b));
         Assert.Equal(a!.AbsoluteUri, b!.AbsoluteUri);
     }
+
+    [Fact]
+    public void Extract_FromEdgesFixture_CanonicalizesHostQueryAndFragments()
+    {
+        var html = File.ReadAllText(Path.Combine(FixtureRoot, "edges.html"));
+        var pageUrl = new Uri("https://fixture.local/edges.html");
+        var links = new HtmlLinkExtractor().Extract(html, pageUrl);
+
+        Assert.Contains(links, u => u.AbsoluteUri == "https://fixture.local/About.html");
+        Assert.Equal(1, links.Count(u => u.AbsoluteUri.Equals("https://fixture.local/About.html", StringComparison.Ordinal)));
+        Assert.Contains(links, u => u.AbsoluteUri == "https://fixture.local/q?a=1&b=2");
+        Assert.Equal(1, links.Count(u => u.AbsoluteUri.StartsWith("https://fixture.local/q?", StringComparison.Ordinal)));
+        Assert.Contains(links, u => u.AbsoluteUri == "https://external.example/cdn");
+        Assert.Contains(links, u => u.AbsoluteUri == "https://fixture.local/docs/guide.html");
+        Assert.DoesNotContain(links, u => u.Scheme is "mailto" or "javascript");
+    }
 }

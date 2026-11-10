@@ -8,11 +8,12 @@
 import { config } from '../config'
 
 export type JobStatus = 'Pending' | 'Running' | 'Completed' | 'Failed' | 'Canceled'
-export type PageStatus = 'Queued' | 'Done' | 'Skipped' | 'Failed'
+export type PageStatus = 'Queued' | 'Processing' | 'Done' | 'Skipped' | 'Failed'
 
 export interface PageCounts {
   total: number
   queued: number
+  processing: number
   done: number
   skipped: number
   failed: number
@@ -29,6 +30,7 @@ export interface CrawlJob {
   completedAt: string | null
   failureReason: string | null
   pageCounts: PageCounts
+  progressPercent: number
 }
 
 export interface PageNode {

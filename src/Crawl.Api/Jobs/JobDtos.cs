@@ -7,7 +7,13 @@ public sealed record CreateJobRequest(string Url, int? MaxDepth = null, int? Max
 
 public sealed record CreateJobResponse(Guid JobId);
 
-public sealed record PageCountsDto(int Total, int Queued, int Done, int Skipped, int Failed);
+public sealed record PageCountsDto(
+    int Total,
+    int Queued,
+    int Processing,
+    int Done,
+    int Skipped,
+    int Failed);
 
 public sealed record JobSummaryDto(
     Guid JobId,
@@ -19,7 +25,9 @@ public sealed record JobSummaryDto(
     DateTimeOffset? StartedAt,
     DateTimeOffset? CompletedAt,
     string? FailureReason,
-    PageCountsDto PageCounts);
+    PageCountsDto PageCounts,
+    /// <summary>0–100 progress from terminal pages / max(total, maxPages budget signal).</summary>
+    int ProgressPercent);
 
 public sealed record JobHistoryItemDto(
     Guid JobId,
@@ -49,10 +57,16 @@ public static class JobDtoMapper
 {
     public static JobSummaryDto ToSummary(CrawlJob job, IReadOnlyList<CrawlPage> pages)
     {
-        var queued = pages.Count(p => p.Status is CrawlPageStatus.Queued or CrawlPageStatus.Processing);
+        var queued = pages.Count(p => p.Status == CrawlPageStatus.Queued);
+        var processing = pages.Count(p => p.Status == CrawlPageStatus.Processing);
         var done = pages.Count(p => p.Status == CrawlPageStatus.Done);
         var skipped = pages.Count(p => p.Status == CrawlPageStatus.Skipped);
         var failed = pages.Count(p => p.Status == CrawlPageStatus.Failed);
+        var terminal = done + skipped + failed;
+        var denominator = Math.Max(pages.Count, 1);
+        var progress = job.Status.IsTerminal()
+            ? 100
+            : (int)Math.Clamp(Math.Round(100.0 * terminal / denominator), 0, 99);
 
         return new(
             job.Id,
@@ -64,7 +78,8 @@ public static class JobDtoMapper
             job.StartedAt,
             job.CompletedAt,
             job.FailureReason,
-            new PageCountsDto(pages.Count, queued, done, skipped, failed));
+            new PageCountsDto(pages.Count, queued, processing, done, skipped, failed),
+            progress);
     }
 
     public static JobTreeDto ToTree(CrawlJob job, IReadOnlyList<CrawlPage> pages) =>

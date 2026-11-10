@@ -12,7 +12,7 @@ export function JobProgress({ counts }: { counts: PageCounts }) {
       </label>
       <p className="hint">
         {counts.done} done · {counts.skipped} skipped · {counts.failed} failed ·{' '}
-        {counts.queued} queued
+        {counts.processing} processing · {counts.queued} queued
       </p>
     </div>
   )

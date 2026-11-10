@@ -59,6 +59,9 @@ public sealed class RabbitMqConnectionFactory(IOptions<RabbitMqOptions> options)
             ["x-dead-letter-exchange"] = "crawl.page.dlx"
         };
 
+        if (_options.EnableDepthPriority)
+            args["x-max-priority"] = (int)_options.MaxDepthPriority;
+
         channel.QueueDeclare(
             _options.PageQueue,
             durable: true,

@@ -2,8 +2,10 @@ using Crawl.Infrastructure;
 using Crawl.Infrastructure.Messaging;
 using Crawl.Infrastructure.Persistence;
 using Crawl.Worker.Fetching;
+using Crawl.Worker.Metrics;
 using Crawl.Worker.Processing;
 using Microsoft.EntityFrameworkCore;
+using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Serilog;
@@ -48,6 +50,12 @@ try
 
             if (!string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]))
                 t.AddOtlpExporter();
+        })
+        .WithMetrics(m =>
+        {
+            m.AddMeter(CrawlWorkerMetrics.Meter.Name);
+            if (!string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]))
+                m.AddOtlpExporter();
         });
 
     var app = builder.Build();

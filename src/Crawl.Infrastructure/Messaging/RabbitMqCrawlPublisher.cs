@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using Crawl.Domain.Messaging;
+using Crawl.Domain.Scheduling;
 using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 
@@ -25,8 +26,12 @@ public sealed class RabbitMqCrawlPublisher(
         props.MessageId = $"{message.JobId}:{message.PageId}";
         props.Headers = new Dictionary<string, object>
         {
-            ["x-retry-count"] = 0
+            ["x-retry-count"] = 0,
+            ["x-crawl-depth"] = message.Depth
         };
+
+        if (connectionFactory.Options.EnableDepthPriority)
+            props.Priority = DepthPriority.ForDepth(message.Depth);
 
         channel.BasicPublish(
             exchange: string.Empty,

@@ -2,6 +2,7 @@ using Crawl.Infrastructure.Html;
 using Crawl.Infrastructure.Http;
 using Crawl.Infrastructure.Messaging;
 using Crawl.Infrastructure.Persistence;
+using Crawl.Infrastructure.Robots;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -28,28 +29,54 @@ public static class DependencyInjection
         services.AddSingleton<RabbitMqConnectionFactory>();
         services.AddSingleton<ICrawlMessagePublisher, RabbitMqCrawlPublisher>();
         services.AddSingleton<HtmlLinkExtractor>();
+        services.AddSingleton<HostPolitenessGate>();
+        services.AddSingleton<FetchConcurrencyGate>();
+        services.AddSingleton<IRobotsTxtService, RobotsTxtService>();
 
         var httpOptions = configuration.GetSection(CrawlHttpOptions.SectionName).Get<CrawlHttpOptions>()
             ?? new CrawlHttpOptions();
 
+        // Manual redirect policy + loop guard lives in HtmlPageFetcher.
         services.AddHttpClient("crawl")
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+            {
+                AllowAutoRedirect = false,
+                AutomaticDecompression = System.Net.DecompressionMethods.All
+            })
             .ConfigureHttpClient(client =>
             {
                 client.Timeout = TimeSpan.FromSeconds(httpOptions.TimeoutSeconds);
-                client.DefaultRequestHeaders.UserAgent.ParseAdd("CrawlAssessmentBot/1.0 (+https://github.com/aaronwesel/assessment)");
+                client.DefaultRequestHeaders.UserAgent.Clear();
+                client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", httpOptions.UserAgent);
             })
             .AddResilienceHandler("crawl-http", builder =>
             {
                 builder.AddRetry(new HttpRetryStrategyOptions
                 {
-                    MaxRetryAttempts = httpOptions.MaxRetryAttempts,
+                    MaxRetryAttempts = Math.Max(1, httpOptions.MaxRetryAttempts),
                     Delay = TimeSpan.FromMilliseconds(250),
                     BackoffType = DelayBackoffType.Exponential,
                     UseJitter = true,
                     ShouldHandle = args => ValueTask.FromResult(
-                        args.Outcome.Result is { IsSuccessStatusCode: false, StatusCode: >= System.Net.HttpStatusCode.InternalServerError }
+                        args.Outcome.Result is { StatusCode: >= System.Net.HttpStatusCode.InternalServerError }
+                        || args.Outcome.Result is { StatusCode: System.Net.HttpStatusCode.RequestTimeout }
+                        || args.Outcome.Result is { StatusCode: System.Net.HttpStatusCode.TooManyRequests }
                         || args.Outcome.Exception is HttpRequestException or TaskCanceledException)
                 });
+            });
+
+        // Separate client for robots.txt (no resilience retry storm on 404).
+        services.AddHttpClient("crawl-robots")
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+            {
+                AllowAutoRedirect = true,
+                MaxAutomaticRedirections = 3
+            })
+            .ConfigureHttpClient(client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(Math.Min(10, httpOptions.TimeoutSeconds));
+                client.DefaultRequestHeaders.UserAgent.Clear();
+                client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", httpOptions.UserAgent);
             });
 
         return services;
