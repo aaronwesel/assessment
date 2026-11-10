@@ -143,6 +143,12 @@ services:
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       CrawlAi__DeepSeekApiKey: ${DEEPSEEK_API_KEY:-}
       CrawlAi__Enabled: ${CRAWL_AI_ENABLED:-true}
+      CrawlAi__IncidentMonitorEnabled: ${CRAWL_AI_INCIDENT_MONITOR_ENABLED:-true}
+      Crawl__Alerts__EmailEnabled: ${CRAWL_ALERTS_EMAIL_ENABLED:-false}
+      Crawl__Alerts__FromAddress: ${SES_FROM_EMAIL:-}
+      Crawl__Alerts__ToAddress: ${CRAWL_ALERT_TO_EMAIL:-}
+      Crawl__Alerts__Provider: ${CRAWL_ALERTS_PROVIDER:-stub}
+      CrawlEgress__Enabled: ${CRAWL_EGRESS_ENABLED:-false}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
       OTEL_SERVICE_NAME: crawl-api
     depends_on:
@@ -184,6 +190,15 @@ services:
       CrawlHttp__MaxRedirects: ${CRAWL_MAX_REDIRECTS:-5}
       CrawlHttp__SortQueryParameters: ${CRAWL_SORT_QUERY:-true}
       RabbitMq__EnableDepthPriority: ${CRAWL_DEPTH_PRIORITY:-true}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      CrawlAi__DeepSeekApiKey: ${DEEPSEEK_API_KEY:-}
+      CrawlAi__Enabled: ${CRAWL_AI_ENABLED:-true}
+      CrawlAi__IncidentMonitorEnabled: ${CRAWL_AI_INCIDENT_MONITOR_ENABLED:-true}
+      Crawl__Alerts__EmailEnabled: ${CRAWL_ALERTS_EMAIL_ENABLED:-false}
+      Crawl__Alerts__FromAddress: ${SES_FROM_EMAIL:-}
+      Crawl__Alerts__ToAddress: ${CRAWL_ALERT_TO_EMAIL:-}
+      Crawl__Alerts__Provider: ${CRAWL_ALERTS_PROVIDER:-stub}
+      CrawlEgress__Enabled: ${CRAWL_EGRESS_ENABLED:-false}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
       OTEL_SERVICE_NAME: crawl-worker
     depends_on:

@@ -1,7 +1,9 @@
+using Crawl.Infrastructure.Egress;
 using Crawl.Infrastructure.Html;
 using Crawl.Infrastructure.Http;
 using Crawl.Infrastructure.Messaging;
 using Crawl.Infrastructure.Persistence;
+using Crawl.Infrastructure.Remediation;
 using Crawl.Infrastructure.Robots;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -19,6 +21,7 @@ public static class DependencyInjection
     {
         services.Configure<RabbitMqOptions>(configuration.GetSection(RabbitMqOptions.SectionName));
         services.Configure<CrawlHttpOptions>(configuration.GetSection(CrawlHttpOptions.SectionName));
+        services.Configure<CrawlEgressOptions>(configuration.GetSection(CrawlEgressOptions.SectionName));
 
         var connectionString = configuration.GetConnectionString("Crawl")
             ?? throw new InvalidOperationException("Connection string 'Crawl' is required.");
@@ -32,16 +35,26 @@ public static class DependencyInjection
         services.AddSingleton<HostPolitenessGate>();
         services.AddSingleton<FetchConcurrencyGate>();
         services.AddSingleton<IRobotsTxtService, RobotsTxtService>();
+        services.AddSingleton<IEgressProxyProvider, ConfigListEgressProxyProvider>();
+        services.AddSingleton<EgressWebProxy>();
+        services.AddSingleton<ICrawlRemediationApplicator, CrawlRemediationApplicator>();
 
         var httpOptions = configuration.GetSection(CrawlHttpOptions.SectionName).Get<CrawlHttpOptions>()
             ?? new CrawlHttpOptions();
 
         // Manual redirect policy + loop guard lives in HtmlPageFetcher.
+        // Proxy: EgressWebProxy reads current hop from IEgressProxyProvider (fail closed when unset).
         services.AddHttpClient("crawl")
-            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+            .ConfigurePrimaryHttpMessageHandler(sp =>
             {
-                AllowAutoRedirect = false,
-                AutomaticDecompression = System.Net.DecompressionMethods.All
+                var egressProxy = sp.GetRequiredService<EgressWebProxy>();
+                return new HttpClientHandler
+                {
+                    AllowAutoRedirect = false,
+                    AutomaticDecompression = System.Net.DecompressionMethods.All,
+                    Proxy = egressProxy,
+                    UseProxy = true
+                };
             })
             .ConfigureHttpClient(client =>
             {

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net;
 using Crawl.Domain.Fetching;
+using Crawl.Domain.Incidents;
 using Crawl.Domain.Links;
 using Crawl.Infrastructure.Http;
 using Crawl.Infrastructure.Robots;
@@ -61,12 +62,22 @@ public sealed class HtmlPageFetcher(
             catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException)
             {
                 logger.LogWarning(ex, "Transient fetch failure for {Url}", current);
-                throw new TransientCrawlException($"Transient fetch failure for {current}", ex);
+                var classified = CrawlFaultClassifier.ClassifyException(
+                    Guid.Empty,
+                    "fetch",
+                    ex,
+                    current.IdnHost);
+                throw new TransientCrawlException(
+                    $"Transient fetch failure for {current}",
+                    classified.Code,
+                    host: current.IdnHost,
+                    inner: ex);
             }
 
             using (response)
             {
                 var code = (int)response.StatusCode;
+                var retryAfter = TryReadRetryAfterSeconds(response);
 
                 if (IsRedirect(code))
                 {
@@ -101,11 +112,52 @@ public sealed class HtmlPageFetcher(
 
                 if (code is 408 or 429 || code >= 500)
                 {
-                    throw new TransientCrawlException($"Transient HTTP {code} for {current}");
+                    var faultCode = code switch
+                    {
+                        429 => CrawlFaultCode.RateLimited,
+                        503 => CrawlFaultCode.ServiceUnavailable,
+                        408 => CrawlFaultCode.Timeout,
+                        _ => CrawlFaultCode.ServiceUnavailable
+                    };
+                    throw new TransientCrawlException(
+                        $"Transient HTTP {code} for {current}",
+                        faultCode,
+                        httpStatus: code,
+                        retryAfterSeconds: retryAfter,
+                        host: current.IdnHost);
                 }
 
                 if (!response.IsSuccessStatusCode)
                 {
+                    // Peek a small snippet for captcha/block heuristics (not persisted / not sent to AI).
+                    string? snippet = null;
+                    try
+                    {
+                        var peek = await ReadAtMostAsync(
+                            await response.Content.ReadAsStreamAsync(cancellationToken),
+                            4096,
+                            cancellationToken);
+                        snippet = peek is null ? null : System.Text.Encoding.UTF8.GetString(peek);
+                    }
+                    catch
+                    {
+                        // ignore peek failures
+                    }
+
+                    if (CrawlFaultClassifier.LooksLikeCaptchaOrBlock(snippet)
+                        || CrawlFaultClassifier.LooksLikeHardBlock(snippet)
+                        || code is 401 or 403)
+                    {
+                        var blockCode = CrawlFaultClassifier.LooksLikeCaptchaOrBlock(snippet)
+                            ? CrawlFaultCode.CaptchaOrBlock
+                            : CrawlFaultCode.HardBlock;
+                        throw new TransientCrawlException(
+                            $"Blocked HTTP {code} for {current}",
+                            blockCode,
+                            httpStatus: code,
+                            host: current.IdnHost);
+                    }
+
                     return FetchResult.Fail($"HTTP {code} {response.ReasonPhrase}");
                 }
 
@@ -145,6 +197,19 @@ public sealed class HtmlPageFetcher(
         }
 
         return FetchResult.Fail($"Exceeded max redirects ({maxRedirects})");
+    }
+
+    private static int? TryReadRetryAfterSeconds(HttpResponseMessage response)
+    {
+        if (response.Headers.RetryAfter?.Delta is TimeSpan delta)
+            return (int)Math.Clamp(delta.TotalSeconds, 0, 3600);
+        if (response.Headers.RetryAfter?.Date is DateTimeOffset date)
+        {
+            var seconds = (date - DateTimeOffset.UtcNow).TotalSeconds;
+            return (int)Math.Clamp(seconds, 0, 3600);
+        }
+
+        return null;
     }
 
     private static bool IsRedirect(int code) =>

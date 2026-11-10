@@ -22,6 +22,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Crawl.Domain\Crawl.Domain.csproj" />
+    <ProjectReference Include="..\Crawl.Infrastructure\Crawl.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="Crawl.Ai.Tests" />
   </ItemGroup>
 

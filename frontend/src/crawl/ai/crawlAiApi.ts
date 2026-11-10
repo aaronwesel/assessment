@@ -11,7 +11,28 @@ export type AiFeatureFlags = {
   summarizationEnabled: boolean
   askTheCrawlEnabled: boolean
   agentLoopEnabled: boolean
+  incidentMonitorEnabled: boolean
   deepSeekConfigured: boolean
+  alertsEmailEnabled: boolean
+}
+
+export type IncidentRemediation = {
+  id: string
+  jobId: string
+  correlationId: string
+  faultCode: string
+  severity: string
+  summary: string
+  host?: string | null
+  pageId?: number | null
+  httpStatus?: number | null
+  remediationKind: string
+  remediationStatus: string
+  remediationDetail?: string | null
+  usedModel: boolean
+  aiAdvice?: string | null
+  alertSent: boolean
+  createdAt: string
 }
 
 export type FieldSuggestion = {
@@ -55,7 +76,24 @@ export async function fetchAiFeatures(): Promise<AiFeatureFlags> {
     summarizationEnabled: !!raw.summarizationEnabled,
     askTheCrawlEnabled: !!raw.askTheCrawlEnabled,
     agentLoopEnabled: !!raw.agentLoopEnabled,
+    incidentMonitorEnabled: !!raw.incidentMonitorEnabled,
     deepSeekConfigured: !!raw.deepSeekConfigured,
+    alertsEmailEnabled: !!raw.alertsEmailEnabled,
+  }
+}
+
+export async function fetchJobIncidents(jobId: string): Promise<{
+  latest: IncidentRemediation | null
+  incidents: IncidentRemediation[]
+}> {
+  const res = await fetch(`${crawlAiBase()}/api/ai/jobs/${jobId}/incidents`)
+  const raw = await parseJson<{
+    latest?: IncidentRemediation | null
+    incidents?: IncidentRemediation[]
+  }>(res)
+  return {
+    latest: raw.latest ?? null,
+    incidents: raw.incidents ?? [],
   }
 }
 

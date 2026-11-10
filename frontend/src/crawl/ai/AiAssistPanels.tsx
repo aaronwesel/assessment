@@ -10,12 +10,14 @@ import {
   confirmLoginStep,
   detectLogin,
   fetchAiFeatures,
+  fetchJobIncidents,
   planAgent,
   suggestFields,
   summarizeJob,
   type AiFeatureFlags,
   type CrawlPageSnapshot,
   type FieldSuggestion,
+  type IncidentRemediation,
 } from './crawlAiApi'
 import './ai-assist.css'
 
@@ -99,6 +101,94 @@ export function AiAssistPanels(props: Props) {
       )}
       {flags.agentLoopEnabled && <AgentPanel jobId={props.jobId} />}
     </section>
+  )
+}
+
+/** Exported for Job Details live view (stretch ops) without waiting for tree unlock. */
+export function IncidentsPanel({
+  jobId,
+  alertsEmailEnabled = false,
+}: {
+  jobId: string
+  alertsEmailEnabled?: boolean
+}) {
+  const [latest, setLatest] = useState<IncidentRemediation | null>(null)
+  const [items, setItems] = useState<IncidentRemediation[]>([])
+  const [note, setNote] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  async function refresh() {
+    setBusy(true)
+    setNote(null)
+    try {
+      const resp = await fetchJobIncidents(jobId)
+      setLatest(resp.latest)
+      setItems(resp.incidents)
+      if (!resp.latest) setNote('No crawl incidents recorded for this job yet.')
+    } catch (e) {
+      setNote((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      setBusy(true)
+      try {
+        const resp = await fetchJobIncidents(jobId)
+        if (cancelled) return
+        setLatest(resp.latest)
+        setItems(resp.incidents)
+        if (!resp.latest) setNote('No crawl incidents recorded for this job yet.')
+      } catch (e) {
+        if (!cancelled) setNote((e as Error).message)
+      } finally {
+        if (!cancelled) setBusy(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [jobId])
+
+  return (
+    <div className="crawl-ai__block">
+      <h3>Incidents / remediations</h3>
+      <p className="crawl-ai__muted">
+        Stretch ops overlay — AI may advise backoff / politeness / egress hop. Does not own link
+        parsing
+        {alertsEmailEnabled ? ' · email alerts on' : ' · email alerts off'}.
+      </p>
+      <button type="button" disabled={busy} onClick={() => void refresh()}>
+        {busy ? 'Refreshing…' : 'Refresh incidents'}
+      </button>
+      {note && <p className="crawl-ai__muted">{note}</p>}
+      {latest ? (
+        <div className="crawl-ai__incident-latest">
+          <p>
+            <strong>Last AI action:</strong> {latest.remediationKind} → {latest.remediationStatus}
+            {latest.usedModel ? ' (model)' : ' (policy)'}
+          </p>
+          <p className="crawl-ai__muted">
+            {latest.faultCode} · {latest.severity} · {new Date(latest.createdAt).toLocaleString()}
+          </p>
+          <p>{latest.summary}</p>
+          {latest.remediationDetail ? <p className="crawl-ai__muted">{latest.remediationDetail}</p> : null}
+          {latest.aiAdvice ? <p className="crawl-ai__muted">Advice: {latest.aiAdvice}</p> : null}
+        </div>
+      ) : null}
+      {items.length > 1 ? (
+        <ul>
+          {items.slice(1, 6).map((i) => (
+            <li key={i.id}>
+              {i.faultCode} · {i.remediationKind}/{i.remediationStatus}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   )
 }
 

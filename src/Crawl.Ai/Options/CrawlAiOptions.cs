@@ -16,6 +16,9 @@ public sealed class CrawlAiOptions
     public bool AskTheCrawlEnabled { get; set; } = true;
     public bool AgentLoopEnabled { get; set; } = true;
 
+    /// <summary>Stretch: AI-assisted crawl incident monitor + safe remediations.</summary>
+    public bool IncidentMonitorEnabled { get; set; } = true;
+
     /// <summary>
     /// DeepSeek API key. Prefer env DEEPSEEK_API_KEY; when empty, clients degrade gracefully.
     /// </summary>

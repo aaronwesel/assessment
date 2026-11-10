@@ -20,7 +20,7 @@ import {
 import { JobProgress } from '../../components/crawl/JobProgress'
 import { PageTree } from '../../components/crawl/PageTree'
 import { StatusBadge } from '../../components/crawl/StatusBadge'
-import { AiAssistPanels } from '../../crawl/ai/AiAssistPanels'
+import { AiAssistPanels, IncidentsPanel } from '../../crawl/ai/AiAssistPanels'
 import type { CrawlPageSnapshot } from '../../crawl/ai/crawlAiApi'
 import { formatDateTime } from '../../crawl/format'
 
@@ -100,6 +100,9 @@ export function JobDetailsPage() {
       {job ? (
         <div className="crawl-details-layout crawl-rise-delay">
           <JobSummary job={job} live={live} onCanceled={() => void loadJob()} />
+          <section className="crawl-panel-block crawl-ai-wrap" aria-label="Crawl incidents">
+            <IncidentsPanel jobId={job.jobId} />
+          </section>
           {job.status === 'Completed' || job.status === 'Failed' || job.status === 'Canceled' ? (
             <JobTreeSection jobId={job.jobId} job={job} />
           ) : (

@@ -178,6 +178,23 @@ Release/rollback (cloud day): bake immutable image tags → ECS new task definit
 
 ---
 
+## Stretch: AI crawl incident monitor (ops / observability)
+
+**Label: stretch** — not required for the graded crawl path. Deterministic .NET still owns HTML link parsing, Domain Link Ratio, retries/DLQ, and the RabbitMQ job pipeline. This overlay strengthens the **RCM portal-ops** story: when payer-like sites rate-limit, time out, or hard-block the crawler, an operator gets structured incidents plus safe, configurable remediations (the same class of knobs you’d tune for eligibility portal scraping).
+
+| Piece | Behavior |
+|-------|----------|
+| Fault emission | Worker emits structured faults (429/503, timeout, DNS, connection reset, captcha/block heuristics) with `jobId` + `correlationId` — **no secrets/PHI/HTML bodies** in prompts or emails |
+| Classifier + backoff | Deterministic severity + Retry-After / exponential backoff + per-host politeness bump (Scrapy `DOWNLOAD_DELAY`-inspired knobs on `HostPolitenessGate`) |
+| AI remediation agent | DeepSeek (optional) advises remediations; falls back to policy when the key is missing |
+| Egress hop | `IEgressProxyProvider` with config-list HTTP(S) proxies / rotating endpoints. Real VPN/residential requires **operator-supplied** endpoints — **fail closed** if none configured (no fake paid VPN keys in repo) |
+| Email alerts | Feature flag `Crawl:Alerts:EmailEnabled` (env `CRAWL_ALERTS_EMAIL_ENABLED`); SES stub or SMTP; alerts on Failed job, repeated DLQ, block remediation. **Never email passwords** |
+| UI | Job Details → Assistive AI → **Incidents / remediations** (last AI action status) |
+
+Config: `CrawlAi:IncidentMonitorEnabled`, `CrawlEgress:Proxies`, `Crawl:Alerts:*`. API: `GET /api/ai/jobs/{jobId}/incidents`.
+
+---
+
 ## OpenTelemetry
 
 OTLP hooks are registered on Api/Worker; export when `OTEL_EXPORTER_OTLP_ENDPOINT` is set.

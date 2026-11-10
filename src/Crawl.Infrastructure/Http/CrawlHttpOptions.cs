@@ -16,6 +16,9 @@ public sealed class CrawlHttpOptions
     /// <summary>Default inter-request delay per host when robots has no Crawl-delay.</summary>
     public int PolitenessDelayMilliseconds { get; set; } = 250;
 
+    /// <summary>Cap for incident-driven politeness bump multipliers (Scrapy DOWNLOAD_DELAY style).</summary>
+    public double MaxPolitenessMultiplier { get; set; } = 16.0;
+
     /// <summary>Honor robots.txt Disallow / Crawl-delay when true.</summary>
     public bool RespectRobotsTxt { get; set; } = true;
 

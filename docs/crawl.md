@@ -71,6 +71,10 @@ Queue `crawl.page` (DLQ `crawl.page.dlq` via `crawl.page.dlx`):
 
 If an older `crawl.page` queue was declared without `x-max-priority`, delete that queue once (or set `RabbitMq__EnableDepthPriority=false`) before restarting.
 
+## Stretch — incident monitor (ops)
+
+Optional AI-assisted fault monitor (`CrawlAi:IncidentMonitorEnabled`): worker emits structured faults → classifier/backoff → DeepSeek remediation advice → politeness/`IEgressProxyProvider` (fail closed) → `GET /api/ai/jobs/{id}/incidents`. See [crawl-readme.md](crawl-readme.md#stretch-ai-crawl-incident-monitor-ops--observability). Does **not** replace Domain Link Ratio or RabbitMQ parsing.
+
 ## Engine (Scrapy-inspired job crawler)
 
 Not a Scrapy port — a .NET job crawler with the pieces that matter for correct HTML crawl graphs:

@@ -2,6 +2,7 @@ using Crawl.Ai.Agent;
 using Crawl.Ai.AskTheCrawl;
 using Crawl.Ai.DeepSeek;
 using Crawl.Ai.FieldFinder;
+using Crawl.Ai.Incidents;
 using Crawl.Ai.LoginAssist;
 using Crawl.Ai.Models;
 using Crawl.Ai.Options;
@@ -21,29 +22,35 @@ namespace Crawl.Ai.Controllers;
 public sealed class CrawlAiController : ControllerBase
 {
     private readonly CrawlAiOptions _options;
+    private readonly CrawlAlertOptions _alerts;
     private readonly IDeepSeekClient _deepSeek;
     private readonly IFieldFinderService _fieldFinder;
     private readonly ILoginAssistService _loginAssist;
     private readonly IResultSummarizer _summarizer;
     private readonly IAskTheCrawlService _ask;
     private readonly IAgentOrchestrator _agent;
+    private readonly ICrawlIncidentMonitor _incidents;
 
     public CrawlAiController(
         IOptions<CrawlAiOptions> options,
+        IOptions<CrawlAlertOptions> alerts,
         IDeepSeekClient deepSeek,
         IFieldFinderService fieldFinder,
         ILoginAssistService loginAssist,
         IResultSummarizer summarizer,
         IAskTheCrawlService ask,
-        IAgentOrchestrator agent)
+        IAgentOrchestrator agent,
+        ICrawlIncidentMonitor incidents)
     {
         _options = options.Value;
+        _alerts = alerts.Value;
         _deepSeek = deepSeek;
         _fieldFinder = fieldFinder;
         _loginAssist = loginAssist;
         _summarizer = summarizer;
         _ask = ask;
         _agent = agent;
+        _incidents = incidents;
     }
 
     [HttpGet("features")]
@@ -55,7 +62,36 @@ public sealed class CrawlAiController : ControllerBase
             _options.Enabled && _options.SummarizationEnabled,
             _options.Enabled && _options.AskTheCrawlEnabled,
             _options.Enabled && _options.AgentLoopEnabled,
-            _deepSeek.IsConfigured));
+            _options.Enabled && _options.IncidentMonitorEnabled,
+            _deepSeek.IsConfigured,
+            _alerts.EmailEnabled));
+
+    [HttpGet("jobs/{jobId:guid}/incidents")]
+    public async Task<ActionResult<JobIncidentsResponse>> Incidents(Guid jobId, CancellationToken ct)
+    {
+        if (!_options.Enabled || !_options.IncidentMonitorEnabled)
+            return StatusCode(StatusCodes.Status503ServiceUnavailable);
+
+        var items = await _incidents.ListForJobAsync(jobId, 20, ct).ConfigureAwait(false);
+        var dtos = items.Select(i => new IncidentRemediationDto(
+            i.Id,
+            i.JobId,
+            i.CorrelationId,
+            i.FaultCode.ToString(),
+            i.Severity.ToString(),
+            i.Summary,
+            i.Host,
+            i.PageId,
+            i.HttpStatus,
+            i.RemediationKind.ToString(),
+            i.RemediationStatus,
+            i.RemediationDetail,
+            i.UsedModel,
+            i.AiAdvice,
+            i.AlertSent,
+            i.CreatedAt)).ToList();
+        return Ok(new JobIncidentsResponse(jobId, dtos.FirstOrDefault(), dtos));
+    }
 
     [HttpPost("jobs/{jobId:guid}/field-finder")]
     public async Task<ActionResult<FieldFinderResponse>> FieldFinder(

@@ -1,4 +1,6 @@
+using Crawl.Ai.Incidents;
 using Crawl.Domain.Fetching;
+using Crawl.Domain.Incidents;
 using Crawl.Domain.Jobs;
 using Crawl.Domain.Links;
 using Crawl.Domain.Messaging;
@@ -20,6 +22,7 @@ public sealed class CrawlPageProcessor(
     HtmlPageFetcher fetcher,
     HtmlLinkExtractor linkExtractor,
     ICrawlMessagePublisher publisher,
+    ICrawlIncidentMonitor incidentMonitor,
     IOptions<CrawlHttpOptions> httpOptions,
     ILogger<CrawlPageProcessor> logger)
 {
@@ -248,8 +251,28 @@ public sealed class CrawlPageProcessor(
             p => p.JobId == job.Id && (p.Status == CrawlPageStatus.Queued || p.Status == CrawlPageStatus.Processing),
             cancellationToken);
 
+        var prior = job.Status;
         job.ReconcileAfterPageFinished(root?.Status ?? CrawlPageStatus.Failed, pending, DateTimeOffset.UtcNow);
         await db.SaveChangesAsync(cancellationToken);
+
+        if (prior != CrawlJobStatus.Failed && job.Status == CrawlJobStatus.Failed)
+        {
+            try
+            {
+                var fault = new CrawlFaultEvent(
+                    job.Id,
+                    $"{job.Id:N}:job-failed",
+                    CrawlFaultCode.JobFailed,
+                    CrawlFaultSeverity.Error,
+                    CrawlFaultClassifier.SanitizeSummary(job.FailureReason ?? "Job failed"),
+                    Host: job.StartHost);
+                await incidentMonitor.HandleAsync(fault, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to emit JobFailed incident for {JobId}", job.Id);
+            }
+        }
     }
 
     private static bool IsUniqueViolation(DbUpdateException ex) =>

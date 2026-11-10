@@ -1,3 +1,4 @@
+using Crawl.Ai;
 using Crawl.Infrastructure;
 using Crawl.Infrastructure.Messaging;
 using Crawl.Infrastructure.Persistence;
@@ -26,6 +27,8 @@ try
         .WriteTo.Console());
 
     builder.Services.AddCrawlInfrastructure(builder.Configuration);
+    // Stretch: incident monitor + DeepSeek remediation agent (does not own link parsing).
+    builder.Services.AddCrawlAi(builder.Configuration);
     builder.Services.AddScoped<HtmlPageFetcher>();
     builder.Services.AddScoped<CrawlPageProcessor>();
     builder.Services.AddHostedService<CrawlPageConsumer>();

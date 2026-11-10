@@ -25,9 +25,14 @@ Config section `CrawlAi` + env `DEEPSEEK_API_KEY` (graceful heuristic mode when 
 | POST | `/jobs/{jobId}/ask` | Ask-the-crawl |
 | POST | `/jobs/{jobId}/agent/plan` | Agentic plan (human confirm) |
 | POST | `/jobs/{jobId}/agent/confirm` | Execute approved tools |
+| GET | `/jobs/{jobId}/incidents` | Stretch: incidents + last remediation |
 | POST | `/integrations/payer/eligibility-stub` | Payer portal stub |
 | POST | `/integrations/clearinghouse/claim-stub` | Clearinghouse stub |
 
+### Stretch — incident monitor
+
+`CrawlAi:IncidentMonitorEnabled` + worker-emitted faults → DeepSeek remediation agent → backoff/politeness/`IEgressProxyProvider` (fail closed) + optional `Crawl:Alerts:EmailEnabled`. See `docs/crawl-readme.md`.
+
 ## Frontend
 
-React panels: `frontend/src/crawl/ai/AiAssistPanels.tsx` — mount on Job Details.
+React panels: `frontend/src/crawl/ai/AiAssistPanels.tsx` — mount on Job Details (includes Incidents / remediations).

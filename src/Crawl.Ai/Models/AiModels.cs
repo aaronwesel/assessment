@@ -141,7 +141,32 @@ public sealed record AiFeatureFlagsResponse(
     bool SummarizationEnabled,
     bool AskTheCrawlEnabled,
     bool AgentLoopEnabled,
-    bool DeepSeekConfigured);
+    bool IncidentMonitorEnabled,
+    bool DeepSeekConfigured,
+    bool AlertsEmailEnabled);
+
+public sealed record IncidentRemediationDto(
+    Guid Id,
+    Guid JobId,
+    string CorrelationId,
+    string FaultCode,
+    string Severity,
+    string Summary,
+    string? Host,
+    long? PageId,
+    int? HttpStatus,
+    string RemediationKind,
+    string RemediationStatus,
+    string? RemediationDetail,
+    bool UsedModel,
+    string? AiAdvice,
+    bool AlertSent,
+    DateTimeOffset CreatedAt);
+
+public sealed record JobIncidentsResponse(
+    Guid JobId,
+    IncidentRemediationDto? Latest,
+    IReadOnlyList<IncidentRemediationDto> Incidents);
 
 public sealed record LoginAssistAuditEvent(
     string EventId,

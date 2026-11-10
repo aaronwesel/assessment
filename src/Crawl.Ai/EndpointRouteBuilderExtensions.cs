@@ -2,11 +2,13 @@ using Crawl.Ai.Agent;
 using Crawl.Ai.AskTheCrawl;
 using Crawl.Ai.DeepSeek;
 using Crawl.Ai.FieldFinder;
+using Crawl.Ai.Incidents;
 using Crawl.Ai.Integrations;
 using Crawl.Ai.LoginAssist;
 using Crawl.Ai.Models;
 using Crawl.Ai.Options;
 using Crawl.Ai.Summarization;
+using Crawl.Domain.Incidents;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -24,7 +26,10 @@ public static class EndpointRouteBuilderExtensions
     {
         var group = app.MapGroup(prefix).WithTags("CrawlAi");
 
-        group.MapGet("/features", (IOptions<CrawlAiOptions> options, IDeepSeekClient deepSeek) =>
+        group.MapGet("/features", (
+            IOptions<CrawlAiOptions> options,
+            IOptions<CrawlAlertOptions> alerts,
+            IDeepSeekClient deepSeek) =>
         {
             var o = options.Value;
             return Results.Ok(new AiFeatureFlagsResponse(
@@ -34,7 +39,25 @@ public static class EndpointRouteBuilderExtensions
                 o.Enabled && o.SummarizationEnabled,
                 o.Enabled && o.AskTheCrawlEnabled,
                 o.Enabled && o.AgentLoopEnabled,
-                deepSeek.IsConfigured));
+                o.Enabled && o.IncidentMonitorEnabled,
+                deepSeek.IsConfigured,
+                alerts.Value.EmailEnabled));
+        });
+
+        group.MapGet("/jobs/{jobId:guid}/incidents", async (
+            Guid jobId,
+            IOptions<CrawlAiOptions> options,
+            ICrawlIncidentMonitor monitor,
+            CancellationToken ct) =>
+        {
+            if (!options.Value.Enabled || !options.Value.IncidentMonitorEnabled)
+            {
+                return Results.Json(new { error = "incident_monitor_disabled" }, statusCode: StatusCodes.Status503ServiceUnavailable);
+            }
+
+            var items = await monitor.ListForJobAsync(jobId, 20, ct).ConfigureAwait(false);
+            var dtos = items.Select(ToDto).ToList();
+            return Results.Ok(new JobIncidentsResponse(jobId, dtos.FirstOrDefault(), dtos));
         });
 
         group.MapPost("/jobs/{jobId:guid}/field-finder", async (
@@ -209,6 +232,24 @@ public static class EndpointRouteBuilderExtensions
 
         return app;
     }
+
+    private static IncidentRemediationDto ToDto(CrawlIncident i) => new(
+        i.Id,
+        i.JobId,
+        i.CorrelationId,
+        i.FaultCode.ToString(),
+        i.Severity.ToString(),
+        i.Summary,
+        i.Host,
+        i.PageId,
+        i.HttpStatus,
+        i.RemediationKind.ToString(),
+        i.RemediationStatus,
+        i.RemediationDetail,
+        i.UsedModel,
+        i.AiAdvice,
+        i.AlertSent,
+        i.CreatedAt);
 
     public sealed record FieldFinderBody(Guid? PageId, string? PageUrl, string? HtmlOrText, string? GoalHint);
     public sealed record LoginDetectBody(string? PageUrl, string? HtmlOrText);

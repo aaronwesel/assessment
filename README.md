@@ -79,6 +79,10 @@ GitHub Actions (`.github/workflows/ci.yml`):
 - [Stripe billing (test mode)](docs/billing-stripe.md) — Checkout, Customer Portal, webhook smoke
 - [Contributing](CONTRIBUTING.md) — PR ownership and CODEOWNERS expectations
 
+## Stretch (not graded core)
+
+AI-assisted **crawl incident monitoring + remediation** (backoff / politeness / optional egress proxy hop / optional email alerts) is documented in [docs/crawl-readme.md](docs/crawl-readme.md#stretch-ai-crawl-incident-monitor-ops--observability). It does **not** replace deterministic crawl parsing, Domain Link Ratio, or the RabbitMQ job pipeline.
+
 ## Explicit non-goals
 
 - No `terraform apply` in prep or CI (cloud sketch only)
