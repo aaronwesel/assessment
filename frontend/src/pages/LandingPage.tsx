@@ -40,6 +40,12 @@ export function LandingPage() {
         <Link to="/crawl/history" className="landing-nav-link">
           History
         </Link>
+        <a href="/swagger" className="landing-nav-link">
+          Crawl API docs
+        </a>
+        <a href="/docs" className="landing-nav-link">
+          Platform API docs
+        </a>
         {isAuthenticated ? null : (
           <Link to="/login" className="landing-nav-link">
             Sign in
@@ -104,7 +110,9 @@ export function LandingPage() {
       </section>
 
       <p className="landing-footnote hint">
-        Quick path for experts: <Link to="/crawl">Start crawl</Link> · AI advises only; link parsing stays in .NET.
+        Quick path for experts: <Link to="/crawl">Start crawl</Link> · Interactive API:{' '}
+        <a href="/swagger">Crawl Swagger</a> · <a href="/docs">FastAPI /docs</a> · AI advises only; link parsing stays
+        in .NET.
       </p>
     </main>
   )

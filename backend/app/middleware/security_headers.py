@@ -24,6 +24,22 @@ _CSP = (
     "object-src 'none'"
 )
 
+# FastAPI /docs loads Swagger UI assets from cdn.jsdelivr.net (local/test only).
+_DOCS_CSP = (
+    "default-src 'self'; "
+    "script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; "
+    "style-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; "
+    "img-src 'self' data: https://cdn.jsdelivr.net; "
+    "font-src 'self' https://cdn.jsdelivr.net; "
+    "connect-src 'self'; "
+    "frame-ancestors 'none'; "
+    "base-uri 'self'; "
+    "form-action 'self'; "
+    "object-src 'none'"
+)
+
+_DOC_PATHS = frozenset({"/docs", "/redoc", "/openapi.json"})
+
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
@@ -38,7 +54,13 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "geolocation=(), microphone=(), camera=()",
         )
         response.headers.setdefault("Cache-Control", "no-store")
-        response.headers.setdefault("Content-Security-Policy", _CSP)
+        if (
+            settings.environment in {"local", "test"}
+            and request.url.path in _DOC_PATHS
+        ):
+            response.headers["Content-Security-Policy"] = _DOCS_CSP
+        else:
+            response.headers.setdefault("Content-Security-Policy", _CSP)
 
         # HSTS only outside local/test — otherwise browsers pin HTTPS on localhost.
         if settings.environment not in {"local", "test"}:

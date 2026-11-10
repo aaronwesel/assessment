@@ -27,6 +27,12 @@ export function Nav() {
         <Link className="nav-link" to="/crawl/history">
           History
         </Link>
+        <a className="nav-link" href="/swagger">
+          Crawl API
+        </a>
+        <a className="nav-link" href="/docs">
+          Platform API
+        </a>
         {isAuthenticated ? (
           <>
             <Link className="nav-link" to="/app">
