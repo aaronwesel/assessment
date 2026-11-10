@@ -92,6 +92,26 @@ class BillingSubscription(SQLModel, table=True):
     )
 
 
+class CrawlJobUsage(SQLModel, table=True):
+    """Idempotent per-job crawl meter ledger (pages-with-results only)."""
+
+    __tablename__ = "crawl_job_usage"
+    __table_args__ = (
+        UniqueConstraint("user_id", "crawl_job_id", name="uq_crawl_job_usage_user_job"),
+    )
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    user_id: str = Field(max_length=36, index=True)
+    crawl_job_id: str = Field(max_length=64, index=True)
+    pages_with_results: int = Field(default=0)
+    billable_pages: int = Field(default=0)
+    stripe_meter_reported: bool = Field(default=False)
+    created_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), server_default=func.now(), nullable=False),
+    )
+
+
 class StripeWebhookEvent(SQLModel, table=True):
     """Idempotency ledger — Stripe may redeliver the same event_id."""
 

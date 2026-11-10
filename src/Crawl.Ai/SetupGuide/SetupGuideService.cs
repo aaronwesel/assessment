@@ -152,7 +152,7 @@ public sealed class SetupGuideService(IHttpClientFactory httpClientFactory, IDee
     {
         var lower = question.ToLowerInvariant();
         if (lower.Contains("cost") || lower.Contains("price"))
-            return "You pay per successfully crawled page (Stripe test meter). Estimate = price × expected pages, capped by max pages.";
+            return "First 5,000 pages-with-results are free; then Stripe test per-page billing at the published rate. Estimate = price × expected pages-with-results, capped by max pages.";
         if (lower.Contains("depth"))
             return depth <= 1
                 ? "Try depth 2 for demo sites like books.toscrape.com — depth 0 only visits the start URL."

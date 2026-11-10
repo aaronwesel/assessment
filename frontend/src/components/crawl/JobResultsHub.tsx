@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
 import type { CrawlJob, PageNode } from '../../api/crawl'
+import { recordCrawlUsage } from '../../api/billing'
 import { fetchCrawlPricing, type CrawlPricing } from '../../api/growth'
 import { summarizeJob } from '../../crawl/ai/crawlAiApi'
 import {
@@ -24,7 +25,7 @@ type Props = {
 
 export function JobResultsHub({ job, root, terminal }: Props) {
   const navigate = useNavigate()
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, tokens } = useAuth()
   const [pricing, setPricing] = useState<CrawlPricing | null>(null)
   const [aiNote, setAiNote] = useState<string | null>(null)
   const [aiBusy, setAiBusy] = useState(false)
@@ -73,10 +74,28 @@ export function JobResultsHub({ job, root, terminal }: Props) {
     }
   }, [terminal, job, report])
 
+  const freePages = pricing?.free_pages_allowance ?? 5000
+  const pagesWithResults = job.pageCounts.done
   const estimatedCost =
-    pricing && job.pageCounts.done > 0
-      ? `${pricing.display_per_page} × ${job.pageCounts.done} pages`
+    pricing && pagesWithResults > 0
+      ? `${pagesWithResults} pages-with-results × ${pricing.display_per_page} (meter: ${freePages.toLocaleString()} free)`
       : null
+
+  useEffect(() => {
+    if (!terminal || !isAuthenticated || !tokens?.access_token || pagesWithResults <= 0) return
+    let cancelled = false
+    void recordCrawlUsage(tokens.access_token, {
+      crawl_job_id: job.jobId,
+      pages_with_results: pagesWithResults,
+    }).catch(() => {
+      if (!cancelled) {
+        /* billing record is best-effort in test mode */
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [terminal, isAuthenticated, tokens?.access_token, job.jobId, pagesWithResults])
 
   return (
     <section className="crawl-panel-block crawl-results-hub" aria-labelledby="crawl-results-heading">
@@ -146,7 +165,13 @@ export function JobResultsHub({ job, root, terminal }: Props) {
           </div>
         ) : null}
 
-        <ReportActions job={job} report={report} navigate={navigate} isAuthenticated={isAuthenticated} />
+        <ReportActions
+          job={job}
+          report={report}
+          navigate={navigate}
+          isAuthenticated={isAuthenticated}
+          freePages={freePages}
+        />
       </MotionWrap>
     </section>
   )
@@ -179,11 +204,13 @@ function ReportActions({
   report,
   navigate,
   isAuthenticated,
+  freePages,
 }: {
   job: CrawlJob
   report: CrawlJobReport
   navigate: ReturnType<typeof useNavigate>
   isAuthenticated: boolean
+  freePages: number
 }) {
   const hasExport = report.rows.length > 0
 
@@ -264,13 +291,13 @@ function ReportActions({
 
       {!isAuthenticated ? (
         <p className="crawl-save-cta hint">
-          <Link to="/register">Create a free account</Link> to attach crawls to your team and
-          enable Stripe test billing per page. Anonymous crawls still work locally.
+          <Link to="/register">Create a free account</Link> for {freePages.toLocaleString()} free pages-with-results,
+          then Stripe test per-page billing. Anonymous crawls still work locally.
         </p>
       ) : (
         <p className="hint">
-          <Link to="/billing">Billing settings</Link> — Stripe test mode for subscription; per-page
-          meter display uses platform growth config.
+          <Link to="/billing">Billing settings</Link> — {freePages.toLocaleString()} free pages-with-results, then
+          Stripe test meter at the published per-page rate.
         </p>
       )}
     </div>

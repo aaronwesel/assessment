@@ -131,10 +131,11 @@ export function WelcomeWizardPage() {
   }
 
   const estPages = Math.min(advanced.maxPages, Math.pow(3, advanced.maxDepth + 1))
+  const freePages = pricing?.free_pages_allowance ?? 5000
   const estCost =
     pricing && estPages
-      ? `up to ~${estPages} pages × ${pricing.display_per_page}`
-      : pricing?.display_per_page ?? 'per page'
+      ? `up to ~${estPages} pages-with-results × ${pricing.display_per_page} (after ${freePages.toLocaleString()} free)`
+      : pricing?.display_per_page ?? 'per page-with-results'
 
   return (
     <CrawlShell

@@ -12,8 +12,10 @@ import {
   createPortalSession,
   fetchBillingConfig,
   fetchBillingStatus,
+  fetchCrawlUsage,
   type BillingConfig,
   type BillingStatus,
+  type CrawlUsageStatus,
 } from '../../api/billing'
 import { BillingActions } from '../../components/billing/BillingActions'
 
@@ -22,6 +24,7 @@ export function BillingSettingsPage() {
   const [searchParams] = useSearchParams()
   const [config, setConfig] = useState<BillingConfig | null>(null)
   const [status, setStatus] = useState<BillingStatus | null>(null)
+  const [crawlUsage, setCrawlUsage] = useState<CrawlUsageStatus | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -32,13 +35,15 @@ export function BillingSettingsPage() {
     async function load() {
       if (!tokens?.access_token) return
       try {
-        const [cfg, st] = await Promise.all([
+        const [cfg, st, usage] = await Promise.all([
           fetchBillingConfig(),
           fetchBillingStatus(tokens.access_token),
+          fetchCrawlUsage(tokens.access_token),
         ])
         if (!cancelled) {
           setConfig(cfg)
           setStatus(st)
+          setCrawlUsage(usage)
           setError(null)
         }
       } catch (err) {
@@ -86,7 +91,9 @@ export function BillingSettingsPage() {
     <main className="page billing-page">
       <h1>Billing</h1>
       <p className="lede">
-        Manage your subscription via Stripe Checkout and the Customer Portal (test mode).
+        Manage your subscription via Stripe Checkout and the Customer Portal (test mode). Crawl billing counts
+        pages-with-results only — {(crawlUsage?.free_pages_allowance ?? 5000).toLocaleString()} free, then{' '}
+        {crawlUsage?.display_per_page ?? 'the published rate'}.
       </p>
 
       {checkoutHint === 'success' ? (
@@ -121,6 +128,22 @@ export function BillingSettingsPage() {
               ? new Date(status.current_period_end).toLocaleString()
               : '—'}
           </dd>
+        </div>
+        <div>
+          <dt>Crawl meter (test)</dt>
+          <dd>
+            {crawlUsage
+              ? `${crawlUsage.pages_with_results_total.toLocaleString()} used · ${crawlUsage.free_pages_remaining.toLocaleString()} free remaining`
+              : '—'}
+          </dd>
+        </div>
+        <div>
+          <dt>Billable pages</dt>
+          <dd>{crawlUsage ? crawlUsage.billable_pages_total.toLocaleString() : '—'}</dd>
+        </div>
+        <div>
+          <dt>Stripe meter configured</dt>
+          <dd>{config?.metered_configured ? 'Yes' : 'No'}</dd>
         </div>
       </dl>
 

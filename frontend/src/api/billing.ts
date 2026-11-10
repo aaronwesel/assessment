@@ -27,6 +27,18 @@ export type BillingConfig = {
   configured: boolean
   publishable_key: string
   price_configured: boolean
+  metered_configured: boolean
+}
+
+export type CrawlUsageStatus = {
+  price_per_page_cents: number
+  currency: string
+  display_per_page: string
+  free_pages_allowance: number
+  stripe_metered_configured: boolean
+  pages_with_results_total: number
+  free_pages_remaining: number
+  billable_pages_total: number
 }
 
 export type BillingStatus = {
@@ -63,6 +75,29 @@ export async function createCheckoutSession(
   })
   if (!response.ok) throw new Error(await readErrorMessage(response))
   return response.json() as Promise<{ session_id: string; url: string }>
+}
+
+export async function fetchCrawlUsage(accessToken: string): Promise<CrawlUsageStatus> {
+  const response = await fetch(apiUrl('/api/v1/billing/crawl-usage'), {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+  if (!response.ok) throw new Error(await readErrorMessage(response))
+  return response.json() as Promise<CrawlUsageStatus>
+}
+
+export async function recordCrawlUsage(
+  accessToken: string,
+  body: { crawl_job_id: string; pages_with_results: number },
+): Promise<CrawlUsageStatus & { recorded: boolean; duplicate: boolean; billable_pages: number }> {
+  const response = await fetch(apiUrl('/api/v1/billing/crawl-usage/record'), {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, ...jsonHeaders },
+    body: JSON.stringify(body),
+  })
+  if (!response.ok) throw new Error(await readErrorMessage(response))
+  return response.json() as Promise<
+    CrawlUsageStatus & { recorded: boolean; duplicate: boolean; billable_pages: number }
+  >
 }
 
 export async function createPortalSession(

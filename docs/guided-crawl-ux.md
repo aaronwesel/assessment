@@ -27,12 +27,14 @@ Assessments PDF extras on top of the graded .NET crawl core: landing, wizard, bi
 | Method | Path | Notes |
 |--------|------|--------|
 | `GET` | `/api/jobs/{id}/pages` | Flat page list (export-friendly) |
-| `GET` | `/api/v1/growth/crawl-pricing` | Public test pricing; env `CRAWL_PRICE_PER_PAGE_CENTS` (default `2`) |
+| `GET` | `/api/v1/growth/crawl-pricing` | Public test pricing + **5000 free pages** (`CRAWL_FREE_PAGES`) |
+| `GET` | `/api/v1/billing/crawl-usage` | JWT — crawl meter totals |
+| `POST` | `/api/v1/billing/crawl-usage/record` | JWT — idempotent job ledger + Stripe meter |
 
 ## Stripe (test)
 
 - Subscription Checkout remains on `/billing` (platform FastAPI).
-- Landing/wizard show **metered per-page** display when `STRIPE_METERED_PRICE_ID` is set; fulfillment still webhook-driven.
+- **5000 free pages-with-results**, then published per-page rate (`CRAWL_PRICE_PER_PAGE_CENTS`); meter events when `STRIPE_METERED_PRICE_ID` is set.
 
 ## Smoke
 

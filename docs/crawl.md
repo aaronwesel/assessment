@@ -153,4 +153,4 @@ Integration: HTML fixtures (incl. query/host/fragment edges), content sniff/char
 
 ## Observability
 
-Structured Serilog logs include `JobId`. OpenTelemetry tracing hooks are registered; set `OTEL_EXPORTER_OTLP_ENDPOINT` to export. Worker meters: `crawl.pages.*`, `crawl.retries.transient`, `crawl.messages.poison`, `crawl.fetch.duration_ms`.
+Structured Serilog logs include `JobId`. OpenTelemetry tracing hooks are registered; set `OTEL_EXPORTER_OTLP_ENDPOINT` to export. Worker meters: `crawl.pages.processed`, `crawl.pages.with_results` (Stripe billable unit), `crawl.pages.failed`, `crawl.pages.skipped`, `crawl.retries.transient`, `crawl.messages.poison`, `crawl.fetch.duration_ms`.

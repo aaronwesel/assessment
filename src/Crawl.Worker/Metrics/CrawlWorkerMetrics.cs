@@ -11,6 +11,11 @@ public static class CrawlWorkerMetrics
         "crawl.pages.processed",
         description: "Pages that reached a terminal Done status");
 
+    /// <summary>Billable unit: parsed pages with link results (Done, not failed/skipped).</summary>
+    public static readonly Counter<long> PagesWithResults = Meter.CreateCounter<long>(
+        "crawl.pages.with_results",
+        description: "Pages with parsed link results — Stripe meter unit in test mode");
+
     public static readonly Counter<long> PagesFailed = Meter.CreateCounter<long>(
         "crawl.pages.failed",
         description: "Pages marked Failed");
