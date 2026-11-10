@@ -371,7 +371,7 @@ code {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
-  animation: landing-rise 0.9s ease-out both;
+  animation: landing-rise 0.9s ease-out;
 }
 
 .landing-brand {
@@ -382,7 +382,7 @@ code {
   letter-spacing: -0.045em;
   margin: 0 0 1rem;
   color: var(--ink);
-  animation: landing-rise 1s ease-out 0.08s both;
+  animation: landing-rise 1s ease-out 0.08s;
 }
 
 .landing-tagline {
@@ -390,14 +390,14 @@ code {
   max-width: 34ch;
   font-size: clamp(1.05rem, 2.2vw, 1.25rem);
   color: var(--muted);
-  animation: landing-rise 1s ease-out 0.16s both;
+  animation: landing-rise 1s ease-out 0.16s;
 }
 
 .landing-cta {
   display: flex;
   flex-wrap: wrap;
   gap: 0.65rem;
-  animation: landing-rise 1s ease-out 0.24s both;
+  animation: landing-rise 1s ease-out 0.24s;
 }
 
 .landing-btn {
@@ -408,7 +408,7 @@ code {
 .landing-visual {
   display: flex;
   justify-content: flex-end;
-  animation: landing-rise 1.1s ease-out 0.2s both;
+  animation: landing-rise 1.1s ease-out 0.2s;
 }
 
 .landing-panel {
@@ -453,8 +453,8 @@ code {
 
 @keyframes landing-rise {
   from {
-    opacity: 0;
-    transform: translateY(14px);
+    opacity: 0.35;
+    transform: translateY(10px);
   }
   to {
     opacity: 1;
