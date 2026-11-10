@@ -11,6 +11,7 @@ public interface IRobotsTxtService
 {
     Task<bool> IsAllowedAsync(Uri url, CancellationToken cancellationToken);
     Task<TimeSpan?> GetCrawlDelayAsync(Uri url, CancellationToken cancellationToken);
+    Task<IReadOnlyList<Uri>> GetSitemapUrlsAsync(Uri pageUrl, CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -39,6 +40,22 @@ public sealed class RobotsTxtService(
 
         var rules = await GetRulesAsync(url, cancellationToken);
         return rules.GetCrawlDelay(options.Value.UserAgentToken);
+    }
+
+    public async Task<IReadOnlyList<Uri>> GetSitemapUrlsAsync(Uri pageUrl, CancellationToken cancellationToken)
+    {
+        var rules = await GetRulesAsync(pageUrl, cancellationToken);
+        if (rules.Sitemaps.Count == 0)
+            return [];
+
+        var results = new List<Uri>();
+        foreach (var raw in rules.Sitemaps)
+        {
+            if (UrlNormalizer.TryNormalize(raw, out var normalized))
+                results.Add(normalized);
+        }
+
+        return results;
     }
 
     private async Task<RobotsTxtRules> GetRulesAsync(Uri pageUrl, CancellationToken cancellationToken)

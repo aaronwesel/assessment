@@ -85,7 +85,8 @@ Not a Scrapy port — a .NET job crawler with the pieces that matter for correct
 | Scheduling | Message-per-page; depth priority + stable URL order within depth (BFS-aware) |
 | Politeness | Per-host delay (`CrawlHttp:PolitenessDelayMilliseconds`, default 250ms) |
 | Concurrency | `MaxConcurrentFetches` per worker + RabbitMQ prefetch |
-| robots.txt | Configurable (`RespectRobotsTxt`, default on); honors Disallow/Allow longest-prefix + `Crawl-delay`; fail-open on fetch errors |
+| robots.txt | Configurable (`RespectRobotsTxt`, default on); honors Disallow/Allow longest-prefix + `Crawl-delay` + parses `Sitemap:` for bounded seed follow; fail-open on fetch errors |
+| SPA / JS shells | HTML-only worker — no JS execution; `SparseHtmlSignals` + seed skip on bot-block shells; see [crawl-readme.md](crawl-readme.md) § SPA / sparse HTML |
 | HTML-only | Content-Type check + byte sniff when type missing/generic; size cap |
 | Charset | `Content-Type` charset → `<meta charset>` → UTF-8 |
 | Redirects | Manual follow, max hops, loop guard; robots re-checked on target |

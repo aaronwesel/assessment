@@ -8,15 +8,22 @@ public sealed class RobotsTxtRules
 {
     private readonly IReadOnlyList<RobotsGroup> _groups;
 
-    public RobotsTxtRules(IReadOnlyList<RobotsGroup> groups) => _groups = groups;
+    public RobotsTxtRules(IReadOnlyList<RobotsGroup> groups, IReadOnlyList<string>? sitemaps = null)
+    {
+        _groups = groups;
+        Sitemaps = sitemaps ?? [];
+    }
 
-    public static RobotsTxtRules Empty { get; } = new([]);
+    public IReadOnlyList<string> Sitemaps { get; }
+
+    public static RobotsTxtRules Empty { get; } = new([], []);
 
     public static RobotsTxtRules Parse(string? content)
     {
         if (string.IsNullOrWhiteSpace(content))
             return Empty;
 
+        var sitemaps = new List<string>();
         var groups = new List<RobotsGroup>();
         var pendingAgents = new List<string>();
         var currentAgents = new List<string>();
@@ -57,6 +64,12 @@ public sealed class RobotsTxtRules
 
             var key = line[..colon].Trim();
             var value = line[(colon + 1)..].Trim();
+
+            if (key.Equals("Sitemap", StringComparison.OrdinalIgnoreCase) && value.Length > 0)
+            {
+                sitemaps.Add(value);
+                continue;
+            }
 
             if (key.Equals("User-agent", StringComparison.OrdinalIgnoreCase))
             {
@@ -101,7 +114,7 @@ public sealed class RobotsTxtRules
         }
 
         Flush();
-        return new RobotsTxtRules(groups);
+        return new RobotsTxtRules(groups, sitemaps);
     }
 
     public bool IsAllowed(string userAgent, Uri url)

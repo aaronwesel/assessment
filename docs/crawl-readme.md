@@ -148,12 +148,25 @@ Operator: inspect DLQ in RabbitMQ management UI; replay is deliberate (not auto)
 
 ## Known limits
 
-- Max depth default **2**; max pages per job ~**200**; HTML-only (no JS render).
+- Max depth default **2**; max pages per job ~**200**; **HTML-only (no JS render)** — see § SPA / sparse HTML below.
 - No SSRF allowlist yet (known gap vs production).
 - Polling UI (SignalR/SSE cut from 4h path).
 - Per-job write serialization may cap huge single-job throughput (fine at 200 pages).
 - Auth optional locally; cloud UI expects platform auth.
 - robots.txt / politeness / redirect-loop guards / query-sort dedup are **on** (see [crawl.md](crawl.md)); still not a Scrapy port.
+
+### SPA / sparse HTML (eBay, React storefronts, marketplaces)
+
+| Signal | Worker behavior |
+|--------|------------------|
+| **No `<a href>` in first response** | No JS engine — client routers (React/Vue) often ship an empty shell; link graph stays tiny (e.g. 1–3 pages). |
+| **Anti-bot / error HTML with HTTP 200** | `SparseHtmlSignals` may **skip the seed** when the body looks like a block page with no navigational links. |
+| **Strict robots.txt** | Default **on** — sites like eBay disallow most paths for non–search-engine bots; skipped pages surface in Job Details diagnosis. |
+| **Seed follow (bounded)** | On a weak seed, worker may also enqueue same-host URLs from `<link rel=canonical>`, `<area href>`, meta refresh, and up to **12** `<loc>` entries from robots **Sitemap** URLs (no JavaScript). |
+
+**Operator playbook:** use a **deeper folder URL** (not the marketing homepage), raise `maxDepth`, or pick a fixture-style site for demos. Headless/render crawl is documented as “next” — not in the graded HTML worker.
+
+Job Details shows API `diagnosis[]` plus client hints (`JobResultsHub` / `crawl-readme`).
 
 ---
 

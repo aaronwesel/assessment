@@ -32,6 +32,7 @@ public static class DependencyInjection
         services.AddSingleton<RabbitMqConnectionFactory>();
         services.AddSingleton<ICrawlMessagePublisher, RabbitMqCrawlPublisher>();
         services.AddSingleton<HtmlLinkExtractor>();
+        services.AddSingleton<CrawlSeedLinkExpander>();
         services.AddSingleton<HostPolitenessGate>();
         services.AddSingleton<FetchConcurrencyGate>();
         services.AddSingleton<IRobotsTxtService, RobotsTxtService>();
@@ -61,6 +62,7 @@ public static class DependencyInjection
                 client.Timeout = TimeSpan.FromSeconds(httpOptions.TimeoutSeconds);
                 client.DefaultRequestHeaders.UserAgent.Clear();
                 client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", httpOptions.UserAgent);
+                client.DefaultRequestHeaders.AcceptLanguage.ParseAdd("en-US,en;q=0.9");
             })
             .AddResilienceHandler("crawl-http", builder =>
             {
