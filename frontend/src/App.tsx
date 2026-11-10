@@ -14,6 +14,7 @@ import { BillingSettingsPage } from './pages/billing/BillingSettingsPage'
 import { HistoryPage } from './pages/crawl/HistoryPage'
 import { JobDetailsPage } from './pages/crawl/JobDetailsPage'
 import { StartCrawlPage } from './pages/crawl/StartCrawlPage'
+import { WelcomeWizardPage } from './pages/crawl/WelcomeWizardPage'
 import { HomePage } from './pages/HomePage'
 import { LandingPage } from './pages/LandingPage'
 import { LoginPage } from './pages/LoginPage'
@@ -37,6 +38,7 @@ export default function App() {
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/crawl/welcome" element={<WelcomeWizardPage />} />
             <Route path="/crawl" element={<StartCrawlPage />} />
             <Route path="/crawl/jobs/:jobId" element={<JobDetailsPage />} />
             <Route path="/crawl/history" element={<HistoryPage />} />

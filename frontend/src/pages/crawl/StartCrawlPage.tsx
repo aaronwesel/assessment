@@ -8,15 +8,24 @@ import { CrawlShell } from '../../components/crawl/CrawlShell'
 
 type FieldErrors = { url?: string[]; maxDepth?: string[] }
 
+function coerceUrl(input: string): string {
+  const trimmed = input.trim()
+  if (!trimmed) return ''
+  if (/^https?:\/\//i.test(trimmed)) return trimmed
+  if (trimmed.includes('.') && !trimmed.includes(' ')) return `https://${trimmed}`
+  return trimmed
+}
+
 function validate(url: string, maxDepth: string): FieldErrors {
   const errors: FieldErrors = {}
+  const normalized = coerceUrl(url)
   try {
-    const parsed = new URL(url)
+    const parsed = new URL(normalized)
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
       errors.url = ['URL must use http or https.']
     }
   } catch {
-    errors.url = ['Enter an absolute URL, e.g. https://example.com.']
+    errors.url = ['Enter a site like example.com or https://example.com/']
   }
   if (maxDepth !== '' && !/^[0-5]$/.test(maxDepth)) {
     errors.maxDepth = ['Max depth must be a whole number between 0 and 5.']
@@ -50,7 +59,7 @@ export function StartCrawlPage() {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    const trimmedUrl = url.trim()
+    const trimmedUrl = coerceUrl(url)
     const errors = validate(trimmedUrl, maxDepth)
     setClientErrors(errors)
     setSubmitError(null)
@@ -84,9 +93,14 @@ export function StartCrawlPage() {
       title="Start a crawl"
       lede="Point the worker at a start URL. It walks internal links, tracks progress live, and reports Domain Link Ratio when the job finishes."
       actions={
-        <Link className="btn btn-ghost" to="/crawl/history">
-          View history
-        </Link>
+        <>
+          <Link className="btn btn-ghost" to="/crawl/welcome">
+            Welcome wizard
+          </Link>
+          <Link className="btn btn-ghost" to="/crawl/history">
+            View history
+          </Link>
+        </>
       }
     >
       <section className="crawl-start-panel crawl-rise-delay" aria-labelledby={`${formId}-heading`}>

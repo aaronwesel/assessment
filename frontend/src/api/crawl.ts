@@ -57,6 +57,18 @@ export interface PageLink {
   isInternal: boolean
 }
 
+export interface PageRow {
+  pageId: number
+  url: string
+  depth: number
+  status: PageStatus
+  domainLinkRatio: number | null
+  linkCount: number | null
+  internalLinkCount: number | null
+  error: string | null
+  parentPageId: number | null
+}
+
 export interface JobSummary {
   jobId: string
   url: string
@@ -161,6 +173,9 @@ export const crawlApi = {
 
   getJobTree: (jobId: string) =>
     request<JobTree>(`/api/jobs/${encodeURIComponent(jobId)}/tree`),
+
+  getJobPages: (jobId: string) =>
+    request<PageRow[]>(`/api/jobs/${encodeURIComponent(jobId)}/pages`),
 
   getPageLinks: (jobId: string, pageId: number) =>
     request<PageLink[]>(

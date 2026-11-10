@@ -76,6 +76,7 @@ GitHub Actions (`.github/workflows/ci.yml`):
 - [Team management + Slack](docs/team-management.md) — org/team roles, JWT APIs, webhook vs Slack app
 - [Workstreams](docs/workstreams.md) — assign API / UI / infra / mobile / AI to developers
 - [Landing + superadmin](docs/superadmin-landing.md) — public landing, self-serve register, admin console smoke
+- [Guided crawl UX](docs/guided-crawl-ux.md) — wizard, Job Details report/export/diagnosis, per-page pricing hints
 - [Stripe billing (test mode)](docs/billing-stripe.md) — Checkout, Customer Portal, webhook smoke
 - [Contributing](CONTRIBUTING.md) — PR ownership and CODEOWNERS expectations
 
