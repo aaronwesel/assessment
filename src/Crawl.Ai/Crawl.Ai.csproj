@@ -1,0 +1,33 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Crawl.Ai</RootNamespace>
+    <Description>
+      Assistive AI overlays for crawl operators (field finder, login assist, summarize, ask-the-crawl).
+      HARD RULE: this library must NEVER parse crawl links or compute Domain Link Ratio — that stays in Crawl.Domain / Worker.
+    </Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="8.0.0" />
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Crawl.Domain\Crawl.Domain.csproj" />
+    <ProjectReference Include="..\Crawl.Infrastructure\Crawl.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Crawl.Ai.Tests" />
+  </ItemGroup>
+
+</Project>

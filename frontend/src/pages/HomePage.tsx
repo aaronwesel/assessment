@@ -31,7 +31,10 @@ export function HomePage() {
         </p>
       ) : null}
       <MfaPanel />
-      <p className="hint">Product screens land after the assessment prompt.</p>
+      <p className="hint">
+        Open the <Link to="/crawl">crawl console</Link> to start a job or view{' '}
+        <Link to="/crawl/history">history</Link>.
+      </p>
     </main>
   )
 }

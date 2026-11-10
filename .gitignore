@@ -73,3 +73,10 @@ apps/ios/**/xcuserdata/
 tmp/
 temp/
 .cache/
+
+# .NET
+**/bin/
+**/obj/
+*.user
+*.suo
+.vs/

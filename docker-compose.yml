@@ -1,7 +1,10 @@
-# Local stack parity with the AWS shape (ECS API + RDS + ElastiCache + SPA).
-# API builds from backend/; frontend remains a stub until its Dockerfile lands.
-# Redis here backs JWT session keys / blacklist the same way ElastiCache will.
-# No secrets committed — copy .env.example → .env for JWT, OAuth, and SES flags.
+# Local stack: platform FastAPI + Crawl (.NET API/Worker) + shared data plane.
+# Crawl shape mirrors cloud: ECS + Aurora Postgres + Amazon MQ (RabbitMQ) + SPA.
+# No secrets committed — copy .env.example → .env.
+#
+# NOTE: On some Cloud Agent VMs, Docker bridge container↔container TCP is broken.
+# Data plane (db/redis/rabbitmq) stays bridged with published ports; app processes
+# use network_mode: host and talk to 127.0.0.1:<published-port>.
 
 services:
   db:
@@ -15,6 +18,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-app} -d ${POSTGRES_DB:-app}"]
       interval: 5s
@@ -32,23 +36,52 @@ services:
       timeout: 3s
       retries: 10
 
+  # Local stand-in for Amazon MQ (RabbitMQ engine).
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    restart: unless-stopped
+    hostname: rabbitmq
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  # Optional OTLP sink (debug exporter). Enable: docker compose --profile otel up
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.114.0
+    profiles: ["otel"]
+    network_mode: host
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./infra/otel/otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
+
+  # Platform A (prep FastAPI) — host network → published db/redis ports.
   api:
     build:
       context: ./backend
       dockerfile: Dockerfile
     image: assessment-api:local
+    network_mode: host
     restart: unless-stopped
-    ports:
-      - "${API_PORT:-8000}:8000"
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://app:changeme-local-only@db:5432/app}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://app:changeme-local-only@127.0.0.1:5432/app}
+      REDIS_URL: ${REDIS_URL:-redis://127.0.0.1:6379/0}
       ENVIRONMENT: ${ENVIRONMENT:-local}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
       JWT_SECRET: ${JWT_SECRET:-replace-with-local-secret}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-15}
       REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
-      # Alias pairs: Settings accepts GOOGLE_* or GOOGLE_OAUTH_* (same for Microsoft).
+      API_HOST: 0.0.0.0
+      API_PORT: ${API_PORT:-8000}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
@@ -89,17 +122,111 @@ services:
       retries: 10
       start_period: 15s
 
-  # Stub until frontend/Dockerfile exists. Replace build/image when UI lands.
-  # http-echo is scratch-based (no shell); health is port reachability / HTTP GET.
-  frontend:
-    image: hashicorp/http-echo:1.0
-    command: ["-text=frontend-stub-ok", "-listen=:3000"]
+  # Crawl.Api — host network against published Postgres/RabbitMQ.
+  crawl-api:
+    build:
+      context: .
+      dockerfile: src/Crawl.Api/Dockerfile
+    image: assessment-crawl-api:local
+    network_mode: host
     restart: unless-stopped
-    ports:
-      - "${FRONTEND_PORT:-3000}:3000"
     environment:
-      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ASPNETCORE_URLS: http://0.0.0.0:${CRAWL_API_PORT:-8080}
+      ConnectionStrings__Crawl: ${CRAWL_DATABASE_URL:-Host=127.0.0.1;Port=5432;Database=${POSTGRES_DB:-app};Username=${POSTGRES_USER:-app};Password=${POSTGRES_PASSWORD:-changeme-local-only}}
+      RabbitMq__HostName: 127.0.0.1
+      RabbitMq__Port: "${RABBITMQ_PORT:-5672}"
+      RabbitMq__UserName: ${RABBITMQ_USER:-guest}
+      RabbitMq__Password: ${RABBITMQ_PASSWORD:-guest}
+      RabbitMq__PageQueue: ${CRAWL_QUEUE:-crawl.page}
+      RabbitMq__PageDlq: ${CRAWL_DLQ:-crawl.page.dlq}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      CrawlAi__DeepSeekApiKey: ${DEEPSEEK_API_KEY:-}
+      CrawlAi__Enabled: ${CRAWL_AI_ENABLED:-true}
+      CrawlAi__IncidentMonitorEnabled: ${CRAWL_AI_INCIDENT_MONITOR_ENABLED:-true}
+      Crawl__Alerts__EmailEnabled: ${CRAWL_ALERTS_EMAIL_ENABLED:-false}
+      Crawl__Alerts__FromAddress: ${SES_FROM_EMAIL:-}
+      Crawl__Alerts__ToAddress: ${CRAWL_ALERT_TO_EMAIL:-}
+      Crawl__Alerts__Provider: ${CRAWL_ALERTS_PROVIDER:-stub}
+      CrawlEgress__Enabled: ${CRAWL_EGRESS_ENABLED:-false}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OTEL_SERVICE_NAME: crawl-api
     depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  # Crawl.Worker — host network; scale carefully (shared host ports).
+  crawl-worker:
+    build:
+      context: .
+      dockerfile: src/Crawl.Worker/Dockerfile
+    image: assessment-crawl-worker:local
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ASPNETCORE_URLS: http://0.0.0.0:${CRAWL_WORKER_PORT:-8081}
+      ConnectionStrings__Crawl: ${CRAWL_DATABASE_URL:-Host=127.0.0.1;Port=5432;Database=${POSTGRES_DB:-app};Username=${POSTGRES_USER:-app};Password=${POSTGRES_PASSWORD:-changeme-local-only}}
+      RabbitMq__HostName: 127.0.0.1
+      RabbitMq__Port: "${RABBITMQ_PORT:-5672}"
+      RabbitMq__UserName: ${RABBITMQ_USER:-guest}
+      RabbitMq__Password: ${RABBITMQ_PASSWORD:-guest}
+      RabbitMq__PageQueue: ${CRAWL_QUEUE:-crawl.page}
+      RabbitMq__PageDlq: ${CRAWL_DLQ:-crawl.page.dlq}
+      CrawlHttp__TimeoutSeconds: ${CRAWL_HTTP_TIMEOUT_SECONDS:-15}
+      CrawlHttp__MaxConcurrentFetches: ${CRAWL_MAX_CONCURRENT_FETCHES:-4}
+      CrawlHttp__PolitenessDelayMilliseconds: ${CRAWL_POLITENESS_DELAY_MS:-250}
+      CrawlHttp__RespectRobotsTxt: ${CRAWL_RESPECT_ROBOTS:-true}
+      CrawlHttp__MaxRedirects: ${CRAWL_MAX_REDIRECTS:-5}
+      CrawlHttp__SortQueryParameters: ${CRAWL_SORT_QUERY:-true}
+      RabbitMq__EnableDepthPriority: ${CRAWL_DEPTH_PRIORITY:-true}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      CrawlAi__DeepSeekApiKey: ${DEEPSEEK_API_KEY:-}
+      CrawlAi__Enabled: ${CRAWL_AI_ENABLED:-true}
+      CrawlAi__IncidentMonitorEnabled: ${CRAWL_AI_INCIDENT_MONITOR_ENABLED:-true}
+      Crawl__Alerts__EmailEnabled: ${CRAWL_ALERTS_EMAIL_ENABLED:-false}
+      Crawl__Alerts__FromAddress: ${SES_FROM_EMAIL:-}
+      Crawl__Alerts__ToAddress: ${CRAWL_ALERT_TO_EMAIL:-}
+      Crawl__Alerts__Provider: ${CRAWL_ALERTS_PROVIDER:-stub}
+      CrawlEgress__Enabled: ${CRAWL_EGRESS_ENABLED:-false}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OTEL_SERVICE_NAME: crawl-worker
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      crawl-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8081/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+        VITE_CRAWL_API_URL: ${VITE_CRAWL_API_URL:-http://localhost:8080}
+    image: assessment-frontend:local
+    network_mode: host
+    restart: unless-stopped
+    # nginx listens on 3000 (see frontend/nginx.conf)
+    depends_on:
+      crawl-api:
+        condition: service_healthy
       api:
         condition: service_healthy
 

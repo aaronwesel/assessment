@@ -1,0 +1,16 @@
+**/.git
+**/.vs
+**/bin
+**/obj
+**/node_modules
+**/dist
+**/.terraform
+**/*.md
+.env
+.env.*
+!.env.example
+**/TestResults
+**/.idea
+backend/.venv
+backend/venv
+apps/
