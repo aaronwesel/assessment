@@ -25,8 +25,8 @@ docker compose --profile otel up --build
 
 | Surface | URL / check |
 |---------|-------------|
-| Crawl API | `http://localhost:8080` · `GET /health` · Swagger `/swagger` |
-| Crawl Worker | `http://localhost:8081/health` + competing consumer on `crawl.page` |
+| Crawl API | `http://localhost:8080` · `GET /health/live` · `GET /health/ready` · Swagger `/swagger` |
+| Crawl Worker | `http://localhost:8081/health/live` · `/health/ready` (Postgres + RabbitMQ) · MassTransit consumer on `crawl.page` |
 | React UI | `http://localhost:3000` · `/crawl`, `/crawl/jobs/:id`, `/crawl/history` · `VITE_CRAWL_API_URL` |
 | RabbitMQ UI | `http://localhost:15672` (default guest/guest) |
 | Postgres | `app` DB = platform · `crawl` DB = crawler (`docker/postgres-init`) |
@@ -50,20 +50,20 @@ dotnet test Crawl.sln
 Browser (React)
     │  REST poll
     ▼
-Crawl.Api  ──publish──►  RabbitMQ (crawl.page → crawl.page.dlq)
-    │                         │
-    │                         ▼
-    │                   Crawl.Worker(s)  ──HTTP GET HTML──► sites
-    │                         │
-    └──────── EF Core ────────┴──► PostgreSQL (jobs / pages / edges)
+Crawl.Api  ──MassTransit send──►  RabbitMQ (crawl.page → crawl.page.dlx → crawl.page.dlq)
+    │                                   │
+    │                                   ▼
+    │                             Crawl.Worker(s)  ──HTTP GET HTML──► sites
+    │                                   │
+    └──────── EF Core ──────────────────┴──► PostgreSQL (jobs / pages / edges)
 ```
 
 | Piece | Responsibility |
 |-------|----------------|
 | `Crawl.Domain` | UrlNormalizer, Domain Link Ratio, job/page/edge rules — **no I/O** |
-| `Crawl.Infrastructure` | EF Core, RabbitMQ declare/publish/consume, HttpClient resilience |
-| `Crawl.Api` | Create job, status, tree, history, cancel, health, OpenAPI |
-| `Crawl.Worker` | At-least-once consume → fetch HTML → parse links (.NET only) → upsert → enqueue children |
+| `Crawl.Infrastructure` | EF Core, MassTransit+RabbitMQ, Polly HTTP resilience, upserts, health |
+| `Crawl.Api` | Create job, status, tree, history, cancel, `/health/live`+`/ready`, OpenAPI |
+| `Crawl.Worker` | MassTransit at-least-once consume → fetch HTML → parse links (.NET only) → `ON CONFLICT` upsert → enqueue children |
 | React | Start crawl, live progress, tree + DLR, history |
 | Platform FastAPI | Auth / billing / ops — optional locally; required for cloud UI auth story |
 
@@ -99,12 +99,26 @@ One message **per page** (`CrawlPageRequested`). Queue `crawl.page`; DLQ `crawl.
 
 At-least-once delivery → handlers must be safe under redelivery and multi-worker races:
 
-1. Unique `(job_id, url)` on `crawl_pages`; unique `(source_page_id, target_url)` on edges.
-2. Terminal page statuses are no-ops on redelivery.
-3. Child inserts tolerate unique races between workers.
-4. Cancel: workers check job status before fetch/enqueue; do not schedule children after cancel.
+1. Unique `(JobId, Url)` on `crawl_pages`; unique `(SourcePageId, TargetUrl)` on edges.
+2. Child fan-out uses PostgreSQL `INSERT … ON CONFLICT (JobId, Url) DO NOTHING RETURNING` (`PageUpsertStore`).
+3. Edges: delete-by-source + `INSERT … ON CONFLICT DO NOTHING`.
+4. Terminal page statuses are no-ops on redelivery.
+5. Cancel: workers check job status before fetch/enqueue; do not schedule children after cancel.
 
-Worker flow: persist page row → publish `CrawlPageRequested` only after save; on consume, skip terminal pages, then fetch → edges → optional child rows → publish children **after** DB commit (`CrawlPageProcessor`).
+Worker flow: persist page row → MassTransit send `CrawlPageRequested` only after save; on consume, skip terminal pages, then fetch → edges → optional child upserts → publish children **after** DB commit (`CrawlPageProcessor`).
+
+---
+
+## Architecture trade-offs (event-driven crawl)
+
+| Decision | Choice | Why |
+|----------|--------|-----|
+| Pull / event-driven | **Event-driven** page messages on RabbitMQ via **MassTransit** | Independent API vs Worker scale-out under heavy jobs; PDF rubric requires async boundary + at-least-once + DLQ. Competing consumers = horizontal worker scale without changing the API. |
+| Messaging library | **MassTransit 8 + RabbitMQ** (not raw `BasicPublish` loops) | `UseMessageRetry(r => r.Exponential(...))` for transient network/HTTP faults; dedicated `crawl.page.dlx` → `crawl.page.dlq`; still keep API and Worker as **separate processes**. |
+| Idempotency | **DB unique indexes + `ON CONFLICT DO NOTHING`** | Broker redelivery and multi-worker races are expected; correctness lives in Postgres, not in “exactly-once” messaging myths. |
+| Outbound HTTP | Polly exponential retry + **per-host politeness gate** | Simulates respectful payer-portal connectivity (rate-limit / IP-block avoidance) without owning eligibility X12. |
+| Correlation | `X-Correlation-Id` middleware → Serilog → MassTransit headers | RCM-style audit trail across API publish and worker consume. |
+| Live UI push | Polling (SignalR cut) | Graded PDF flow works with Job Details poll; SignalR remains a stretch, not a substitute for jobs/tree/DLR. |
 
 ---
 
@@ -138,11 +152,19 @@ Tree API exposes per-node DLR for Done pages; React shows `DLR` on the job tree.
 
 | Stage | Behavior |
 |-------|----------|
-| Transient HTTP / broker | Retry with backoff; `x-retry-count` header |
-| Exhausted attempts / poison | Nack without requeue → `crawl.page.dlq` |
+| Transient HTTP / broker | MassTransit `UseMessageRetry` **exponential** backoff (min 200ms → max 30s) |
+| Exhausted attempts / poison | Faulted messages → dedicated DLX `crawl.page.dlx` → queue `crawl.page.dlq` |
 | Job cancel | Finish in-flight page without further fan-out |
 
 Operator: inspect DLQ in RabbitMQ management UI; replay is deliberate (not auto).
+
+## Health
+
+| Endpoint | Meaning |
+|----------|---------|
+| `GET /health/live` | Process up (liveness) |
+| `GET /health/ready` | Postgres + RabbitMQ connectivity (readiness; worker must pass both) |
+| `GET /health` | Same as ready (Compose / legacy probes) |
 
 ---
 

@@ -1,4 +1,5 @@
 using Crawl.Infrastructure.Egress;
+using Crawl.Infrastructure.Health;
 using Crawl.Infrastructure.Html;
 using Crawl.Infrastructure.Http;
 using Crawl.Infrastructure.Messaging;
@@ -8,6 +9,7 @@ using Crawl.Infrastructure.Robots;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Http.Resilience;
 using Polly;
 
@@ -29,12 +31,8 @@ public static class DependencyInjection
         services.AddDbContext<CrawlDbContext>(options =>
             options.UseNpgsql(connectionString));
 
-        services.AddSingleton<RabbitMqConnectionFactory>();
-        services.AddSingleton<ICrawlMessagePublisher, RabbitMqCrawlPublisher>();
-        services.AddSingleton<ICrawlProgressPublisher, RabbitMqProgressPublisher>();
-        services.AddSingleton<RabbitMqQueueStats>();
+        services.AddScoped<PageUpsertStore>();
         services.AddSingleton<HtmlLinkExtractor>();
-        // Process-local spacing; multi-worker hosts also take a Postgres advisory lock (see WaitAsync).
         services.AddSingleton<HostPolitenessGate>();
         services.AddSingleton<FetchConcurrencyGate>();
         services.AddSingleton<IRobotsTxtService, RobotsTxtService>();
@@ -42,19 +40,11 @@ public static class DependencyInjection
         services.AddSingleton<EgressWebProxy>();
         services.AddSingleton<ICrawlRemediationApplicator, CrawlRemediationApplicator>();
 
-        // Shared Npgsql data source for cross-worker host politeness advisory locks.
-        services.AddSingleton(sp =>
-        {
-            var cs = configuration.GetConnectionString("Crawl")
-                ?? throw new InvalidOperationException("Connection string 'Crawl' is required.");
-            return Npgsql.NpgsqlDataSource.Create(cs);
-        });
-
         var httpOptions = configuration.GetSection(CrawlHttpOptions.SectionName).Get<CrawlHttpOptions>()
             ?? new CrawlHttpOptions();
 
-        // Manual redirect policy + loop guard lives in HtmlPageFetcher.
-        // Proxy: EgressWebProxy reads current hop from IEgressProxyProvider (fail closed when unset).
+        // Polly (via Microsoft.Extensions.Http.Resilience): exponential retry for transient HTTP —
+        // simulates respectful payer-API connectivity together with HostPolitenessGate per-host delay.
         services.AddHttpClient("crawl")
             .ConfigurePrimaryHttpMessageHandler(sp =>
             {
@@ -89,7 +79,6 @@ public static class DependencyInjection
                 });
             });
 
-        // Separate client for robots.txt (no resilience retry storm on 404).
         services.AddHttpClient("crawl-robots")
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
             {
@@ -104,5 +93,21 @@ public static class DependencyInjection
             });
 
         return services;
+    }
+
+    /// <summary>
+    /// Shared health registration: <c>live</c> = process up; <c>ready</c> = Postgres + RabbitMQ.
+    /// </summary>
+    public static IHealthChecksBuilder AddCrawlHealthChecks(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        var crawlCs = configuration.GetConnectionString("Crawl")
+            ?? throw new InvalidOperationException("ConnectionStrings:Crawl is required.");
+
+        return services.AddHealthChecks()
+            .AddCheck("self", () => HealthCheckResult.Healthy("process up"), tags: ["live"])
+            .AddNpgSql(crawlCs, name: "postgres", tags: ["ready"])
+            .AddCheck<RabbitMqConnectivityHealthCheck>("rabbitmq", tags: ["ready"]);
     }
 }

@@ -16,6 +16,9 @@ public sealed class PageEdgeConfiguration : IEntityTypeConfiguration<PageEdge>
         builder.Property(x => x.IsInternal).IsRequired();
 
         // Idempotency: same outgoing target from a source page is unique.
+        // SourcePageId ≈ parent edge; TargetUrl is the child URL key (external targets never become pages).
         builder.HasIndex(x => new { x.SourcePageId, x.TargetUrl }).IsUnique();
+        builder.HasIndex(x => x.TargetUrl);
+        builder.HasIndex(x => x.SourcePageId);
     }
 }

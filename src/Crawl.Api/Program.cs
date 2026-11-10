@@ -1,12 +1,13 @@
 using System.Diagnostics;
 using Crawl.Ai;
 using Crawl.Api.Jobs;
-using Crawl.Api.Ops;
-using Crawl.Api.Realtime;
+using Crawl.Api.Middleware;
 using Crawl.Infrastructure;
 using Crawl.Infrastructure.Messaging;
 using Crawl.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Serilog;
@@ -28,27 +29,16 @@ try
         .WriteTo.Console());
 
     builder.Services.AddCrawlInfrastructure(builder.Configuration);
-    // Assistive AI overlays — additive; never owns link parse / Domain Link Ratio.
+    builder.Services.AddCrawlMassTransitPublisher(builder.Configuration);
     builder.Services.AddCrawlAi(builder.Configuration);
     builder.Services.AddScoped<JobService>();
-    builder.Services.AddSignalR();
-    builder.Services.AddHostedService<JobProgressRelayService>();
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(options =>
     {
         options.SwaggerDoc("v1", new() { Title = "Crawl API", Version = "v1" });
     });
 
-    var rabbit = builder.Configuration.GetSection(RabbitMqOptions.SectionName).Get<RabbitMqOptions>()
-        ?? new RabbitMqOptions();
-    var crawlCs = builder.Configuration.GetConnectionString("Crawl")
-        ?? throw new InvalidOperationException("ConnectionStrings:Crawl is required.");
-
-    builder.Services.AddHealthChecks()
-        .AddNpgSql(crawlCs, name: "postgres")
-        .AddRabbitMQ(
-            $"amqp://{Uri.EscapeDataString(rabbit.UserName)}:{Uri.EscapeDataString(rabbit.Password)}@{rabbit.HostName}:{rabbit.Port}{rabbit.VirtualHost}",
-            name: "rabbitmq");
+    builder.Services.AddCrawlHealthChecks(builder.Configuration);
 
     builder.Services.AddOpenTelemetry()
         .ConfigureResource(r => r.AddService("Crawl.Api"))
@@ -56,22 +46,18 @@ try
         {
             t.AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation()
-                .AddSource("Crawl.Api");
+                .AddEntityFrameworkCoreInstrumentation()
+                .AddSource("Crawl.Api")
+                .AddSource("MassTransit");
 
-            // Hook is always registered; export only when an endpoint is configured.
             if (!string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]))
                 t.AddOtlpExporter();
         });
 
-    // SignalR needs AllowCredentials → cannot use AllowAnyOrigin. Reflect request origin for local/Compose demos.
     builder.Services.AddCors(options =>
     {
         options.AddDefaultPolicy(policy =>
-            policy
-                .SetIsOriginAllowed(_ => true)
-                .AllowAnyHeader()
-                .AllowAnyMethod()
-                .AllowCredentials());
+            policy.AllowAnyHeader().AllowAnyMethod().AllowAnyOrigin());
     });
 
     var app = builder.Build();
@@ -79,11 +65,10 @@ try
     using (var scope = app.Services.CreateScope())
     {
         var db = scope.ServiceProvider.GetRequiredService<CrawlDbContext>();
-        var migrateLog = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("CrawlDbMigrator");
-        // Safe under concurrent API + worker startups (advisory lock + retry).
-        await CrawlDbMigrator.MigrateSafeAsync(db, migrateLog);
+        await db.Database.MigrateAsync();
     }
 
+    app.UseMiddleware<CorrelationIdMiddleware>();
     app.UseSerilogRequestLogging();
     app.UseCors();
     app.UseSwagger();
@@ -172,10 +157,26 @@ try
         .WithOpenApi();
 
     app.MapCrawlAi();
-    app.MapScaleSignals();
-    app.MapHub<CrawlJobHub>("/hubs/crawl-jobs");
 
-    app.MapHealthChecks("/health");
+    // Liveness: process up. Readiness: Postgres + RabbitMQ. Keep /health as ready for Compose.
+    app.MapHealthChecks("/health/live", new HealthCheckOptions
+    {
+        Predicate = check => check.Tags.Contains("live"),
+        ResultStatusCodes =
+        {
+            [HealthStatus.Healthy] = StatusCodes.Status200OK,
+            [HealthStatus.Degraded] = StatusCodes.Status200OK,
+            [HealthStatus.Unhealthy] = StatusCodes.Status503ServiceUnavailable
+        }
+    });
+    app.MapHealthChecks("/health/ready", new HealthCheckOptions
+    {
+        Predicate = check => check.Tags.Contains("ready")
+    });
+    app.MapHealthChecks("/health", new HealthCheckOptions
+    {
+        Predicate = check => check.Tags.Contains("ready")
+    });
     app.MapGet("/", () => Results.Redirect("/swagger"));
 
     await app.RunAsync();

@@ -35,9 +35,9 @@ Job-based **web crawler** (.NET 8 API + Worker · RabbitMQ · Postgres · React)
 
    | Service | Default URL / check |
    |---------|---------------------|
-| Crawl API | `GET http://localhost:8080/health` · Swagger `/swagger` · SignalR `/hubs/crawl-jobs` · `GET /api/ops/queue` |
-| Crawl Worker | `GET http://localhost:8081/health` · `GET /ops/queue` |
-| Frontend | `http://localhost:3000` (`/crawl`, `/crawl/history`) |
+   | Crawl API | `GET /health/live` · `/health/ready` · Swagger `/swagger` |
+   | Crawl Worker | `GET /health/live` · `/health/ready` (Postgres + RabbitMQ) |
+   | Frontend | `http://localhost:3000` (`/crawl`, `/crawl/history`) |
    | RabbitMQ | `http://localhost:15672` (guest/guest by default) |
    | Platform API | `GET http://localhost:8000/health` |
    | Postgres | `app` + `crawl` databases on `localhost:5432` |
@@ -82,8 +82,7 @@ GitHub Actions (`.github/workflows/ci.yml`):
 
 ## Stretch (not graded core)
 
-- **Elastic workers + SignalR + distributed edge cases** — queue-backed `Crawl.Worker` scale-out (ECS/ASG sketch), Job Details live progress over SignalR (REST fallback), multi-worker claim/DLQ/politeness hardening. Narrative: [docs/crawl-readme.md](docs/crawl-readme.md) first/cut/next · details [docs/crawl.md](docs/crawl.md).
-- AI-assisted **crawl incident monitoring + remediation** (backoff / politeness / optional egress proxy hop / optional email alerts) is documented in [docs/crawl-readme.md](docs/crawl-readme.md#stretch-ai-crawl-incident-monitor-ops--observability). It does **not** replace deterministic crawl parsing, Domain Link Ratio, or the RabbitMQ job pipeline.
+AI-assisted **crawl incident monitoring + remediation** (backoff / politeness / optional egress proxy hop / optional email alerts) is documented in [docs/crawl-readme.md](docs/crawl-readme.md#stretch-ai-crawl-incident-monitor-ops--observability). It does **not** replace deterministic crawl parsing, Domain Link Ratio, or the RabbitMQ job pipeline.
 
 ## Explicit non-goals
 
