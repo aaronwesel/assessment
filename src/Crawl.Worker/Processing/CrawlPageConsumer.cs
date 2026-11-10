@@ -97,6 +97,7 @@ public sealed class CrawlPageConsumer(
                     message?.JobId,
                     message?.PageId);
                 CrawlWorkerMetrics.PoisonMessages.Add(1);
+                await TryFailPageForDeliveryAsync(message, ex, exhausted: true);
                 channel.BasicNack(args.DeliveryTag, multiple: false, requeue: false);
                 return;
             }
@@ -144,7 +145,33 @@ public sealed class CrawlPageConsumer(
                     exhausted: true);
             }
 
+            await TryFailPageForDeliveryAsync(message, ex, exhausted: true);
             channel.BasicNack(args.DeliveryTag, multiple: false, requeue: false);
+        }
+    }
+
+    private async Task TryFailPageForDeliveryAsync(CrawlPageRequested? message, Exception ex, bool exhausted)
+    {
+        if (message is null || !exhausted)
+            return;
+
+        try
+        {
+            using var scope = scopeFactory.CreateScope();
+            var processor = scope.ServiceProvider.GetRequiredService<CrawlPageProcessor>();
+            var summary = CrawlFaultClassifier.SanitizeSummary($"{ex.GetType().Name}: {ex.Message}");
+            await processor.RecordPageDeliveryFailureAsync(
+                message,
+                $"Message abandoned after delivery failure ({summary})",
+                CancellationToken.None);
+        }
+        catch (Exception failEx)
+        {
+            logger.LogWarning(
+                failEx,
+                "Failed to mark page Failed after delivery exhaustion JobId={JobId} PageId={PageId}",
+                message.JobId,
+                message.PageId);
         }
     }
 
