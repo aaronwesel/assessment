@@ -58,7 +58,7 @@ public sealed class JobService(
         return JobDtoMapper.ToSummary(job, pages);
     }
 
-    public async Task<PageTreeNodeDto?> GetTreeAsync(Guid jobId, CancellationToken cancellationToken)
+    public async Task<JobTreeDto?> GetTreeAsync(Guid jobId, CancellationToken cancellationToken)
     {
         var job = await db.Jobs.AsNoTracking().FirstOrDefaultAsync(j => j.Id == jobId, cancellationToken);
         if (job is null)
@@ -68,7 +68,24 @@ public sealed class JobService(
             .Where(p => p.JobId == jobId)
             .ToListAsync(cancellationToken);
 
-        return JobDtoMapper.ToTree(pages);
+        return JobDtoMapper.ToTree(job, pages);
+    }
+
+    public async Task<IReadOnlyList<PageLinkDto>?> GetPageLinksAsync(
+        Guid jobId,
+        long pageId,
+        CancellationToken cancellationToken)
+    {
+        var pageExists = await db.Pages.AsNoTracking()
+            .AnyAsync(p => p.JobId == jobId && p.Id == pageId, cancellationToken);
+        if (!pageExists)
+            return null;
+
+        return await db.Edges.AsNoTracking()
+            .Where(e => e.SourcePageId == pageId)
+            .OrderBy(e => e.TargetUrl)
+            .Select(e => new PageLinkDto(e.TargetUrl, e.IsInternal))
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<PagedHistoryDto> GetHistoryAsync(int page, int pageSize, CancellationToken cancellationToken)
@@ -79,21 +96,13 @@ public sealed class JobService(
         var query = db.Jobs.AsNoTracking().OrderByDescending(j => j.CreatedAt);
         var total = await query.CountAsync(cancellationToken);
         var jobs = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
-        var jobIds = jobs.Select(j => j.Id).ToList();
-
-        var pageCounts = await db.Pages.AsNoTracking()
-            .Where(p => jobIds.Contains(p.JobId))
-            .GroupBy(p => p.JobId)
-            .Select(g => new { JobId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.JobId, x => x.Count, cancellationToken);
 
         var items = jobs.Select(j => new JobHistoryItemDto(
             j.Id,
             j.Url,
             j.Status.ToString(),
             j.CreatedAt,
-            j.CompletedAt,
-            pageCounts.GetValueOrDefault(j.Id))).ToList();
+            j.CompletedAt)).ToList();
 
         return new PagedHistoryDto(items, page, pageSize, total);
     }

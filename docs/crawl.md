@@ -22,12 +22,14 @@ docker compose up --build db rabbitmq crawl-api crawl-worker
 # infra
 docker compose up -d db rabbitmq
 
-# API (applies EF migrations)
+# API (applies EF migrations) — launchSettings binds http://localhost:5059
 dotnet run --project src/Crawl.Api
 
-# Worker (separate terminal)
-dotnet run --project src/Crawl.Worker
+# Worker (separate terminal) — health on http://localhost:8081 unless overridden
+dotnet run --project src/Crawl.Worker --urls http://localhost:8081
 ```
+
+Vite/UI defaults to `VITE_CRAWL_API_URL=http://localhost:5059` for source runs; Compose maps the API on **8080**.
 
 ## API
 
@@ -35,9 +37,10 @@ dotnet run --project src/Crawl.Worker
 |--------|------|---------|
 | `POST` | `/api/jobs` | `{ "url", "maxDepth?"(default 2), "maxPages?"(default 200) }` → `{ jobId }` |
 | `GET` | `/api/jobs/{jobId}` | Status + progress summary |
-| `GET` | `/api/jobs/{jobId}/tree` | Hierarchical page tree + Domain Link Ratio |
+| `GET` | `/api/jobs/{jobId}/tree` | `{ jobId, status, root }` tree + Domain Link Ratio |
+| `GET` | `/api/jobs/{jobId}/pages/{pageId}/links` | Outgoing links for a page |
 | `GET` | `/api/jobs?page=&pageSize=` | History (newest first) |
-| `POST` | `/api/jobs/{jobId}/cancel` | Cancel in-flight job |
+| `POST` | `/api/jobs/{jobId}/cancel` | Cancel in-flight job (`204`) |
 | `GET` | `/health` | Postgres + RabbitMQ checks |
 
 ## Message schema

@@ -115,14 +115,18 @@ try
 
     jobs.MapGet("/{jobId:guid}/tree", async (Guid jobId, JobService service, CancellationToken ct) =>
         {
-            var exists = await service.GetSummaryAsync(jobId, ct);
-            if (exists is null)
-                return Results.NotFound();
-
             var tree = await service.GetTreeAsync(jobId, ct);
-            return Results.Ok(tree);
+            return tree is null ? Results.NotFound() : Results.Ok(tree);
         })
         .WithName("GetJobTree")
+        .WithOpenApi();
+
+    jobs.MapGet("/{jobId:guid}/pages/{pageId:long}/links", async (Guid jobId, long pageId, JobService service, CancellationToken ct) =>
+        {
+            var links = await service.GetPageLinksAsync(jobId, pageId, ct);
+            return links is null ? Results.NotFound() : Results.Ok(links);
+        })
+        .WithName("GetPageLinks")
         .WithOpenApi();
 
     jobs.MapGet("/", async (int? page, int? pageSize, JobService service, CancellationToken ct) =>
@@ -140,7 +144,7 @@ try
                 return Results.NotFound();
             if (!canceled)
                 return Results.Conflict(new { error });
-            return Results.Ok(new { jobId, status = "Canceled" });
+            return Results.NoContent();
         })
         .WithName("CancelJob")
         .WithOpenApi();

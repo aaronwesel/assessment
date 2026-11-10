@@ -7,6 +7,8 @@ public sealed record CreateJobRequest(string Url, int? MaxDepth = null, int? Max
 
 public sealed record CreateJobResponse(Guid JobId);
 
+public sealed record PageCountsDto(int Total, int Queued, int Done, int Skipped, int Failed);
+
 public sealed record JobSummaryDto(
     Guid JobId,
     string Url,
@@ -17,18 +19,14 @@ public sealed record JobSummaryDto(
     DateTimeOffset? StartedAt,
     DateTimeOffset? CompletedAt,
     string? FailureReason,
-    int PagesTotal,
-    int PagesDone,
-    int PagesFailed,
-    int PagesQueued);
+    PageCountsDto PageCounts);
 
 public sealed record JobHistoryItemDto(
     Guid JobId,
     string Url,
     string Status,
     DateTimeOffset CreatedAt,
-    DateTimeOffset? CompletedAt,
-    int PagesTotal);
+    DateTimeOffset? CompletedAt);
 
 public sealed record PagedHistoryDto(IReadOnlyList<JobHistoryItemDto> Items, int Page, int PageSize, int TotalCount);
 
@@ -43,10 +41,20 @@ public sealed record PageTreeNodeDto(
     string? Error,
     IReadOnlyList<PageTreeNodeDto> Children);
 
+public sealed record JobTreeDto(Guid JobId, string Status, PageTreeNodeDto? Root);
+
+public sealed record PageLinkDto(string Url, bool IsInternal);
+
 public static class JobDtoMapper
 {
-    public static JobSummaryDto ToSummary(CrawlJob job, IReadOnlyList<CrawlPage> pages) =>
-        new(
+    public static JobSummaryDto ToSummary(CrawlJob job, IReadOnlyList<CrawlPage> pages)
+    {
+        var queued = pages.Count(p => p.Status is CrawlPageStatus.Queued or CrawlPageStatus.Processing);
+        var done = pages.Count(p => p.Status == CrawlPageStatus.Done);
+        var skipped = pages.Count(p => p.Status == CrawlPageStatus.Skipped);
+        var failed = pages.Count(p => p.Status == CrawlPageStatus.Failed);
+
+        return new(
             job.Id,
             job.Url,
             job.Status.ToString(),
@@ -56,12 +64,13 @@ public static class JobDtoMapper
             job.StartedAt,
             job.CompletedAt,
             job.FailureReason,
-            pages.Count,
-            pages.Count(p => p.Status == CrawlPageStatus.Done),
-            pages.Count(p => p.Status is CrawlPageStatus.Failed or CrawlPageStatus.Skipped),
-            pages.Count(p => p.Status is CrawlPageStatus.Queued or CrawlPageStatus.Processing));
+            new PageCountsDto(pages.Count, queued, done, skipped, failed));
+    }
 
-    public static PageTreeNodeDto? ToTree(IReadOnlyList<CrawlPage> pages)
+    public static JobTreeDto ToTree(CrawlJob job, IReadOnlyList<CrawlPage> pages) =>
+        new(job.Id, job.Status.ToString(), BuildRoot(pages));
+
+    private static PageTreeNodeDto? BuildRoot(IReadOnlyList<CrawlPage> pages)
     {
         var byParent = pages.ToLookup(p => p.ParentPageId);
         var root = pages.FirstOrDefault(p => p.ParentPageId is null && p.Depth == 0);
