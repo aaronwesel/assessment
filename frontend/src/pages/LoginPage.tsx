@@ -4,8 +4,7 @@
  */
 import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
-import { GoogleOneTap } from '../components/GoogleOneTap'
-import { MicrosoftSignIn } from '../components/MicrosoftSignIn'
+import { AuthSocialStack } from '../components/AuthSocialStack'
 import { PasswordForm } from '../components/PasswordForm'
 
 export function LoginPage() {
@@ -24,11 +23,7 @@ export function LoginPage() {
       </p>
 
       <div className="auth-stack">
-        <GoogleOneTap />
-        <MicrosoftSignIn />
-        <div className="divider" role="separator">
-          <span>or</span>
-        </div>
+        <AuthSocialStack />
         <PasswordForm />
       </div>
     </main>

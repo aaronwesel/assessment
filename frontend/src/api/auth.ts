@@ -48,6 +48,7 @@ export async function registerPassword(input: {
   email: string
   password: string
   fullName?: string
+  healthcareAccount?: boolean
 }): Promise<AuthTokens> {
   const response = await fetch(apiUrl('/api/v1/auth/register'), {
     method: 'POST',
@@ -56,6 +57,7 @@ export async function registerPassword(input: {
       email: input.email,
       password: input.password,
       full_name: input.fullName || null,
+      healthcare_account: Boolean(input.healthcareAccount),
     }),
   })
   if (!response.ok) throw new Error(await readErrorMessage(response))
@@ -82,7 +84,9 @@ export async function loginPassword(input: {
   return response.json() as Promise<AuthTokens>
 }
 
-export async function fetchMfaStatus(accessToken: string): Promise<{ mfa_enabled: boolean }> {
+export async function fetchMfaStatus(
+  accessToken: string,
+): Promise<{ mfa_enabled: boolean; mfa_policy_required?: boolean }> {
   const response = await fetch(apiUrl('/api/v1/auth/mfa/status'), {
     headers: { Authorization: `Bearer ${accessToken}` },
   })
@@ -176,6 +180,8 @@ export async function fetchMe(
     email?: string | null
     full_name?: string | null
     roles: string[]
+    mfa_enabled?: boolean
+    mfa_policy_required?: boolean
   }
   return {
     id: body.subject,
@@ -183,6 +189,8 @@ export async function fetchMe(
     name: body.full_name ?? body.email ?? 'User',
     roles: body.roles,
     provider,
+    mfaEnabled: Boolean(body.mfa_enabled),
+    mfaPolicyRequired: Boolean(body.mfa_policy_required),
   }
 }
 

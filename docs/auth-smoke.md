@@ -60,9 +60,16 @@ npm run dev            # http://localhost:5173
 ```
 
 1. Register / sign in with email+password → land on Home with email + roles.
-2. With Google client ID: One Tap / button → backend `/auth/google/onetap` → Home.
-3. With Microsoft client ID: popup → `/auth/microsoft/onetap` → Home.
-4. Sign out → access token rejected on `/auth/me`.
+2. **Register and login** pages both show Google One Tap + Microsoft when client IDs are set.
+3. Standard accounts: optional MFA banner with **Skip for now** on Home; enroll shows a **TOTP QR** after **Enroll**.
+4. Healthcare checkbox on register sets `mfa_policy_required` — required MFA messaging (no skip).
+5. With Google client ID: One Tap / button → backend `/auth/google/onetap` → Home.
+6. With Microsoft client ID: popup → `/auth/microsoft/onetap` → Home.
+7. Sign out → access token rejected on `/auth/me`.
+
+```bash
+bash scripts/e2e-auth-mfa-gate.sh
+```
 
 ## Playwright (optional)
 
