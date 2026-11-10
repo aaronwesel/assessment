@@ -31,6 +31,7 @@ public static class DependencyInjection
 
         services.AddSingleton<RabbitMqConnectionFactory>();
         services.AddSingleton<ICrawlMessagePublisher, RabbitMqCrawlPublisher>();
+        services.AddSingleton<IJobProgressPublisher, RabbitMqJobProgressPublisher>();
         services.AddSingleton<HtmlLinkExtractor>();
         services.AddSingleton<HostPolitenessGate>();
         services.AddSingleton<FetchConcurrencyGate>();

@@ -150,7 +150,7 @@ Operator: inspect DLQ in RabbitMQ management UI; replay is deliberate (not auto)
 
 - Max depth default **2**; max pages per job ~**200**; HTML-only (no JS render).
 - No SSRF allowlist yet (known gap vs production).
-- Polling UI (SignalR/SSE cut from 4h path).
+- Live Job Details: SignalR hub `/hubs/crawl-jobs` with REST polling fallback.
 - Per-job write serialization may cap huge single-job throughput (fine at 200 pages).
 - Auth optional locally; cloud UI expects platform auth.
 - robots.txt / politeness / redirect-loop guards / query-sort dedup are **on** (see [crawl.md](crawl.md)); still not a Scrapy port.
@@ -168,14 +168,14 @@ Maps the home-assignment **implemented first / cut / next** trade-offs from the 
 | Domain tests — `UrlNormalizer` + **Domain Link Ratio** | Wrong graph math invalidates the whole demo; cheap to test; blocks API/UI lies about ratios. |
 | API + Postgres — jobs/pages/edges, create/status/tree/history/cancel/health | Contract the UI and worker share; persistence proves idempotent schema before broker load. |
 | Worker + RabbitMQ — consume, fetch, parse, upsert, retries/DLQ | Rubric’s async boundary; without at-least-once + DLQ the job model is incomplete. |
-| React poll UI — Start / Details / History | End-to-end proof for reviewers; polling is enough for a timed crawl. |
+| React Start / Details / History (+ SignalR live progress, REST fallback) | End-to-end proof for reviewers; PDF flow survives if the hub drops. |
 | Docker Compose + this README + CI | One-command repro + gates on `dotnet test` / docker builds — submission hygiene. |
 
 ### Cut if needed — and why
 
 | Cut | Why it was deferrable |
 |-----|------------------------|
-| SignalR / SSE live push | Polling + 200-page cap is acceptable for assessment; push adds broker/UI coupling for little rubric credit. |
+| Per-job ephemeral EC2 / JS render | Competing workers + SignalR cover the live demo; ephemeral host handoff stays stretch-next. |
 | `terraform apply` / live AWS cutover | **Forbidden** in prep/CI anyway; sketches (`CRAWL_CLOUD.md`, modules) document scale without account risk. |
 | Salesforce live webhook, Rekognition screenshots | Role “much more” — interfaces/outbox stubs OK; live CRM/OCR needs creds and ops time. |
 | Strong SSRF allowlist | Known production gap; robots + politeness + redirect limits shipped first for crawl correctness. |

@@ -1,5 +1,5 @@
 /**
- * Job Details — live progress, actionable report, tree + DLR, export, element pick, AI assist.
+ * Job Details — live progress (SignalR + REST fallback), report, tree + DLR, export, AI assist.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
@@ -25,8 +25,7 @@ import { StatusBadge } from '../../components/crawl/StatusBadge'
 import { AiAssistPanels, IncidentsPanel } from '../../crawl/ai/AiAssistPanels'
 import type { CrawlPageSnapshot } from '../../crawl/ai/crawlAiApi'
 import { formatDateTime } from '../../crawl/format'
-
-const POLL_MS = 1500
+import { useJobRealtime, type LiveTransport } from '../../crawl/useJobRealtime'
 
 export function JobDetailsPage() {
   const { jobId = '' } = useParams()
@@ -36,7 +35,6 @@ export function JobDetailsPage() {
   const [treeLoading, setTreeLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const liveStatus = job?.status
 
   const loadJob = useCallback(
     async (opts?: { silent?: boolean }) => {
@@ -85,21 +83,24 @@ export function JobDetailsPage() {
     [jobId],
   )
 
+  const silentRefreshJob = useCallback(() => loadJob({ silent: true }), [loadJob])
+  const silentRefreshTree = useCallback(() => loadTree({ silent: true }), [loadTree])
+
   useEffect(() => {
     void loadJob()
     void loadTree()
   }, [loadJob, loadTree])
 
-  useEffect(() => {
-    if (!liveStatus || !isActiveJobStatus(liveStatus)) return
-    const timer = window.setInterval(() => {
-      void loadJob({ silent: true })
-      void loadTree({ silent: true })
-    }, POLL_MS)
-    return () => window.clearInterval(timer)
-  }, [liveStatus, loadJob, loadTree])
-
   const live = !!job && isActiveJobStatus(job.status)
+  const { transport, pollMs } = useJobRealtime({
+    jobId,
+    job,
+    setJob,
+    isLive: live,
+    refreshJob: silentRefreshJob,
+    refreshTree: silentRefreshTree,
+  })
+
   const terminal = !!job && !isActiveJobStatus(job.status)
   const root = tree?.root ?? null
 
@@ -136,7 +137,13 @@ export function JobDetailsPage() {
 
       {job ? (
         <div className="crawl-details-layout crawl-rise-delay">
-          <JobSummary job={job} live={live} onCanceled={() => void loadJob()} />
+          <JobSummary
+            job={job}
+            live={live}
+            transport={transport}
+            pollMs={pollMs}
+            onCanceled={() => void loadJob()}
+          />
 
           <JobResultsHub job={job} root={root} terminal={terminal} />
 
@@ -176,10 +183,14 @@ export function JobDetailsPage() {
 function JobSummary({
   job,
   live,
+  transport,
+  pollMs,
   onCanceled,
 }: {
   job: CrawlJob
   live: boolean
+  transport: LiveTransport
+  pollMs: number
   onCanceled: () => void
 }) {
   const [cancelPending, setCancelPending] = useState(false)
@@ -264,9 +275,9 @@ function JobSummary({
           </Link>
         )}
         {live ? (
-          <span className="hint crawl-poll-hint">
+          <span className="hint crawl-poll-hint" data-transport={transport}>
             <span className="crawl-live-dot" aria-hidden="true" />
-            Updating every {POLL_MS / 1000}s
+            {transportLabel(transport, pollMs)}
           </span>
         ) : null}
       </div>
@@ -321,6 +332,19 @@ function JobTreeSection({
       ) : null}
     </section>
   )
+}
+
+function transportLabel(transport: LiveTransport, pollMs: number): string {
+  switch (transport) {
+    case 'signalr':
+      return 'Live via SignalR'
+    case 'connecting':
+      return 'Connecting live channel…'
+    case 'polling':
+      return `REST polling every ${pollMs / 1000}s`
+    default:
+      return 'Live updates'
+  }
 }
 
 function flattenPages(node: PageNode | null, acc: CrawlPageSnapshot[] = []): CrawlPageSnapshot[] {

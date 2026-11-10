@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Crawl.Ai;
 using Crawl.Api.Jobs;
+using Crawl.Api.Realtime;
 using Crawl.Infrastructure;
 using Crawl.Infrastructure.Messaging;
 using Crawl.Infrastructure.Persistence;
@@ -29,6 +30,8 @@ try
     // Assistive AI overlays — additive; never owns link parse / Domain Link Ratio.
     builder.Services.AddCrawlAi(builder.Configuration);
     builder.Services.AddScoped<JobService>();
+    builder.Services.AddSignalR();
+    builder.Services.AddHostedService<JobProgressRelayService>();
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(options =>
     {
@@ -161,6 +164,7 @@ try
         .WithOpenApi();
 
     app.MapCrawlAi();
+    app.MapHub<CrawlJobsHub>("/hubs/crawl-jobs");
 
     app.MapHealthChecks("/health");
     app.MapGet("/", () => Results.Redirect("/swagger"));

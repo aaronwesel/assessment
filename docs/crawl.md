@@ -48,6 +48,9 @@ Vite/UI defaults to `VITE_CRAWL_API_URL=http://localhost:5059` for source runs; 
 | `GET` | `/api/jobs?page=&pageSize=` | History (newest first) |
 | `POST` | `/api/jobs/{jobId}/cancel` | Cancel in-flight job (`204`) |
 | `GET` | `/health` | Postgres + RabbitMQ checks |
+| SignalR | `/hubs/crawl-jobs` | `SubscribeJob` / `UnsubscribeJob` → `jobProgress` events (REST polling remains the fallback) |
+
+Live progress fanout: workers publish to RabbitMQ exchange `crawl.job.events`; API `JobProgressRelayService` pushes to SignalR groups `job:{jobId}`.
 
 ## Message schema
 

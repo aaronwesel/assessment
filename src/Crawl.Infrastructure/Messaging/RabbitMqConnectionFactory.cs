@@ -76,6 +76,13 @@ public sealed class RabbitMqConnectionFactory(IOptions<RabbitMqOptions> options)
             exclusive: false,
             autoDelete: false,
             arguments: args);
+
+        // Live progress fanout: workers publish; each API instance binds an exclusive queue.
+        channel.ExchangeDeclare(
+            _options.JobEventsExchange,
+            ExchangeType.Fanout,
+            durable: true,
+            autoDelete: false);
     }
 
     public void Dispose()

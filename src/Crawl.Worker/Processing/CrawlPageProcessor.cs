@@ -22,6 +22,7 @@ public sealed class CrawlPageProcessor(
     HtmlPageFetcher fetcher,
     HtmlLinkExtractor linkExtractor,
     ICrawlMessagePublisher publisher,
+    IJobProgressPublisher progressPublisher,
     ICrawlIncidentMonitor incidentMonitor,
     IOptions<CrawlHttpOptions> httpOptions,
     ILogger<CrawlPageProcessor> logger)
@@ -69,6 +70,7 @@ public sealed class CrawlPageProcessor(
         job.MarkRunning(DateTimeOffset.UtcNow);
         page.MarkProcessing();
         await db.SaveChangesAsync(cancellationToken);
+        // Progress fan-out happens after page terminal / reconcile (avoids double events).
 
         var normalizeOptions = new UrlNormalizationOptions
         {
@@ -236,13 +238,17 @@ public sealed class CrawlPageProcessor(
         if (job.Status.IsTerminal())
         {
             await db.SaveChangesAsync(cancellationToken);
+            await PublishProgressAsync(job, CrawlJobProgressEvent.KindJobStatus, cancellationToken);
             return;
         }
 
         // Re-check cancel that may have landed while processing.
         await db.Entry(job).ReloadAsync(cancellationToken);
         if (job.Status.IsTerminal())
+        {
+            await PublishProgressAsync(job, CrawlJobProgressEvent.KindJobStatus, cancellationToken);
             return;
+        }
 
         var root = await db.Pages.AsNoTracking()
             .FirstOrDefaultAsync(p => p.JobId == job.Id && p.Depth == 0 && p.ParentPageId == null, cancellationToken);
@@ -254,6 +260,11 @@ public sealed class CrawlPageProcessor(
         var prior = job.Status;
         job.ReconcileAfterPageFinished(root?.Status ?? CrawlPageStatus.Failed, pending, DateTimeOffset.UtcNow);
         await db.SaveChangesAsync(cancellationToken);
+
+        var kind = prior != job.Status || job.Status.IsTerminal()
+            ? CrawlJobProgressEvent.KindJobStatus
+            : CrawlJobProgressEvent.KindPageProgress;
+        await PublishProgressAsync(job, kind, cancellationToken);
 
         if (prior != CrawlJobStatus.Failed && job.Status == CrawlJobStatus.Failed)
         {
@@ -272,6 +283,24 @@ public sealed class CrawlPageProcessor(
             {
                 logger.LogWarning(ex, "Failed to emit JobFailed incident for {JobId}", job.Id);
             }
+        }
+    }
+
+    private async Task PublishProgressAsync(CrawlJob job, string eventKind, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var pages = await db.Pages.AsNoTracking()
+                .Where(p => p.JobId == job.Id)
+                .ToListAsync(cancellationToken);
+            await progressPublisher.PublishAsync(
+                CrawlJobProgressEvent.FromJobAndPages(job, pages, eventKind),
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            // Live updates are best-effort; REST polling remains authoritative.
+            logger.LogDebug(ex, "Failed to publish live progress for job {JobId}", job.Id);
         }
     }
 
