@@ -31,13 +31,24 @@ public static class DependencyInjection
 
         services.AddSingleton<RabbitMqConnectionFactory>();
         services.AddSingleton<ICrawlMessagePublisher, RabbitMqCrawlPublisher>();
+        services.AddSingleton<ICrawlProgressPublisher, RabbitMqProgressPublisher>();
+        services.AddSingleton<RabbitMqQueueStats>();
         services.AddSingleton<HtmlLinkExtractor>();
+        // Process-local spacing; multi-worker hosts also take a Postgres advisory lock (see WaitAsync).
         services.AddSingleton<HostPolitenessGate>();
         services.AddSingleton<FetchConcurrencyGate>();
         services.AddSingleton<IRobotsTxtService, RobotsTxtService>();
         services.AddSingleton<IEgressProxyProvider, ConfigListEgressProxyProvider>();
         services.AddSingleton<EgressWebProxy>();
         services.AddSingleton<ICrawlRemediationApplicator, CrawlRemediationApplicator>();
+
+        // Shared Npgsql data source for cross-worker host politeness advisory locks.
+        services.AddSingleton(sp =>
+        {
+            var cs = configuration.GetConnectionString("Crawl")
+                ?? throw new InvalidOperationException("Connection string 'Crawl' is required.");
+            return Npgsql.NpgsqlDataSource.Create(cs);
+        });
 
         var httpOptions = configuration.GetSection(CrawlHttpOptions.SectionName).Get<CrawlHttpOptions>()
             ?? new CrawlHttpOptions();

@@ -10,9 +10,12 @@ using Crawl.Ai.Options;
 using Crawl.Ai.SetupGuide;
 using Crawl.Ai.Summarization;
 using Crawl.Domain.Incidents;
+using Crawl.Domain.Pages;
+using Crawl.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 namespace Crawl.Ai;
@@ -153,9 +156,10 @@ public static class EndpointRouteBuilderExtensions
 
         group.MapPost("/jobs/{jobId:guid}/summarize", async (
             Guid jobId,
-            SummarizeBody body,
+            SummarizeBody? body,
             IOptions<CrawlAiOptions> options,
             IResultSummarizer service,
+            CrawlDbContext db,
             CancellationToken ct) =>
         {
             if (!options.Value.Enabled || !options.Value.SummarizationEnabled)
@@ -163,16 +167,13 @@ public static class EndpointRouteBuilderExtensions
                 return Results.Json(new { error = "summarization_disabled" }, statusCode: StatusCodes.Status503ServiceUnavailable);
             }
 
-            var resp = await service.SummarizeAsync(
-                new SummarizeRequest(
-                    jobId,
-                    body.SeedUrl ?? "",
-                    body.Status ?? "Unknown",
-                    body.PageCount,
-                    body.EdgeCount,
-                    body.Pages ?? Array.Empty<CrawlPageSnapshot>(),
-                    body.Failures),
-                ct).ConfigureAwait(false);
+            // UI usually sends snapshots; Swagger/empty body hydrates from Postgres (still cites precomputed DLR — never recomputes).
+            body ??= new SummarizeBody(null, null, 0, 0, null, null);
+            var request = await HydrateSummarizeAsync(jobId, body, db, ct).ConfigureAwait(false);
+            if (request is null)
+                return Results.NotFound();
+
+            var resp = await service.SummarizeAsync(request, ct).ConfigureAwait(false);
             return Results.Ok(resp);
         });
 
@@ -268,6 +269,77 @@ public static class EndpointRouteBuilderExtensions
         i.AiAdvice,
         i.AlertSent,
         i.CreatedAt);
+
+    /// <summary>
+    /// When the client omits snapshots, load job/pages from Postgres.
+    /// Domain Link Ratio values are read as already computed — AI never recalculates them.
+    /// </summary>
+    private static async Task<SummarizeRequest?> HydrateSummarizeAsync(
+        Guid jobId,
+        SummarizeBody body,
+        CrawlDbContext db,
+        CancellationToken ct)
+    {
+        var hasClientPages = body.Pages is { Count: > 0 };
+        var hasClientMeta = !string.IsNullOrWhiteSpace(body.SeedUrl)
+            && !string.IsNullOrWhiteSpace(body.Status)
+            && body.Status != "Unknown"
+            && body.PageCount > 0;
+
+        if (hasClientPages && hasClientMeta)
+        {
+            return new SummarizeRequest(
+                jobId,
+                body.SeedUrl!,
+                body.Status!,
+                body.PageCount,
+                body.EdgeCount,
+                body.Pages!,
+                body.Failures);
+        }
+
+        var job = await db.Jobs.AsNoTracking().FirstOrDefaultAsync(j => j.Id == jobId, ct).ConfigureAwait(false);
+        if (job is null)
+            return null;
+
+        var pages = await db.Pages.AsNoTracking()
+            .Where(p => p.JobId == jobId)
+            .OrderBy(p => p.Depth)
+            .ThenBy(p => p.Url)
+            .Take(80)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        var pageIds = pages.Select(p => p.Id).ToList();
+        var edgeCount = body.EdgeCount > 0
+            ? body.EdgeCount
+            : await db.Edges.AsNoTracking()
+                .CountAsync(e => pageIds.Contains(e.SourcePageId), ct)
+                .ConfigureAwait(false);
+
+        var snapshots = (body.Pages is { Count: > 0 } ? body.Pages : pages.Select(p => new CrawlPageSnapshot(
+            p.Id.ToString(),
+            p.Url,
+            p.Depth,
+            p.DomainLinkRatioValue is null ? null : (double)p.DomainLinkRatioValue.Value,
+            p.Status.ToString(),
+            p.Error)).ToList())!;
+
+        var failures = body.Failures
+            ?? pages.Where(p => p.Status == CrawlPageStatus.Failed && p.Error is not null)
+                .Select(p => p.Error!)
+                .Take(20)
+                .ToList();
+
+        return new SummarizeRequest(
+            jobId,
+            string.IsNullOrWhiteSpace(body.SeedUrl) ? job.Url : body.SeedUrl!,
+            string.IsNullOrWhiteSpace(body.Status) || body.Status == "Unknown" ? job.Status.ToString() : body.Status!,
+            body.PageCount > 0 ? body.PageCount : pages.Count,
+            edgeCount,
+            snapshots,
+            failures);
+    }
 
     public sealed record SetupPreviewBody(string? Url, int? MaxDepth, int? WizardStep, string? Question);
     public sealed record FieldFinderBody(Guid? PageId, string? PageUrl, string? HtmlOrText, string? GoalHint);
