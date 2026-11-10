@@ -17,9 +17,16 @@ worker_image_tag = "stable"
 api_cpu              = 1024
 api_memory           = 2048
 api_desired_count    = 2
+api_min_capacity     = 2
+api_max_capacity     = 10
 worker_cpu           = 1024
 worker_memory        = 2048
 worker_desired_count = 2
+worker_min_capacity  = 2
+worker_max_capacity  = 8
+
+# ALB RequestCountPerTarget target (tune on assessment day)
+api_requests_per_target = 800
 
 db_engine_version = "15.4"
 db_instance_class = "db.r6g.large"

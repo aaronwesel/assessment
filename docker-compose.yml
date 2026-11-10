@@ -1,6 +1,7 @@
-# Local stack parity with AWS shape: API + Postgres + Redis + frontend.
+# Local stack parity with the AWS shape (ECS API + RDS + ElastiCache + SPA).
 # API builds from backend/; frontend remains a stub until its Dockerfile lands.
-# No secrets here — use .env (from .env.example).
+# Redis here backs JWT session keys / blacklist the same way ElastiCache will.
+# No secrets committed — copy .env.example → .env for JWT, OAuth, and SES flags.
 
 services:
   db:

@@ -1,4 +1,12 @@
-"""Verify Google Identity Services (One Tap) ID tokens via google-auth."""
+"""
+Verify Google Identity Services (One Tap) ID tokens via `google-auth`.
+
+The SPA receives a GIS credential JWT and POSTs it to `/auth/google/onetap`.
+We validate audience (= GOOGLE_CLIENT_ID), issuer, and signature with Google's
+certs — never trust a client-decoded payload alone.
+
+HIPAA / PII: do not log the raw token or email claims; only verification outcomes.
+"""
 
 from __future__ import annotations
 

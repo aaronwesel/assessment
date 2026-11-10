@@ -1,4 +1,12 @@
-"""DeepSeek client interface. Feature flag OFF by default; never send PHI in prompts."""
+"""
+DeepSeek client interface. Feature flag OFF by default; never send PHI in prompts.
+
+Why a stub + disabled default: AI calls are a HIPAA risk surface (prompts can
+leak patient content to a third party). Keep `DEEPSEEK_ENABLED=false` until
+assessment AI flows define allowlisted, de-identified prompt shapes.
+
+Do not log prompt text even when the feature is enabled.
+"""
 
 from __future__ import annotations
 

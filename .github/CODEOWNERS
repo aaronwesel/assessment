@@ -1,0 +1,39 @@
+# CODEOWNERS — map monorepo paths to GitHub team labels / handles.
+#
+# Prep note: replace @assessment/... placeholders with real GitHub teams once
+# org teams exist. Until then, these labels document intended ownership for
+# review routing (see docs/workstreams.md and CONTRIBUTING.md).
+#
+# Pattern: last matching pattern wins. Keep path → stream mapping stable so
+# PR review requests stay predictable during the timed assessment.
+
+# Default catch-all — platform / lead
+*                              @assessment/platform-leads
+
+# Backend / API stream
+/backend/                      @assessment/api-team
+/backend/app/api/              @assessment/api-team
+/backend/app/models/           @assessment/api-team
+/backend/alembic/              @assessment/api-team
+
+# Frontend / UI stream
+/frontend/                     @assessment/ui-team
+
+# Infra / Terraform / Compose ops
+/infra/                        @assessment/infra-team
+/docker-compose.yml            @assessment/infra-team
+/.github/workflows/            @assessment/infra-team
+
+# Mobile apps
+/apps/                         @assessment/mobile-team
+/apps/android/                 @assessment/mobile-team
+/apps/ios/                     @assessment/mobile-team
+
+# AI clients / feature flags (DeepSeek, Rekognition stubs)
+/backend/app/clients/deepseek.py      @assessment/ai-team
+/backend/app/clients/rekognition.py   @assessment/ai-team
+
+# Docs + contributor workflow (shared)
+/docs/                         @assessment/platform-leads
+/CONTRIBUTING.md               @assessment/platform-leads
+/.github/CODEOWNERS            @assessment/platform-leads

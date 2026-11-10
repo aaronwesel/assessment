@@ -1,6 +1,7 @@
+import { MfaPanel } from '../components/MfaPanel'
 import { useAuth } from '../auth/AuthContext'
 
-/** Authenticated home — shows identity from /auth/me; no domain screens yet. */
+/** Authenticated home — shows identity from /auth/me; MFA enroll/verify stub. */
 export function HomePage() {
   const { user } = useAuth()
 
@@ -21,6 +22,7 @@ export function HomePage() {
           <dd>{user?.roles?.join(', ') || '—'}</dd>
         </div>
       </dl>
+      <MfaPanel />
       <p className="hint">Product screens land after the assessment prompt.</p>
     </main>
   )

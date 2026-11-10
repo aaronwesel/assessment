@@ -14,8 +14,11 @@ def test_health_ready(client: TestClient) -> None:
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "ready"
+    assert body["db_ok"] is True
+    assert body["redis_ok"] is True
     assert body["deepseek_enabled"] is False
     assert body["rekognition_enabled"] is False
+    assert body["ses_enabled"] is False
 
 
 def test_api_v1_health(client: TestClient) -> None:

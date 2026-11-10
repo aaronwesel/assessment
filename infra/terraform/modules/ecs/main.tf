@@ -1,3 +1,16 @@
+# =============================================================================
+# ECS Fargate — API (ALB-backed) + worker (async) services
+# =============================================================================
+#
+# desired_count on each service is the *initial* capacity. Application Auto
+# Scaling (see autoscaling.tf) owns runtime DesiredCount; lifecycle below
+# ignores drift so terraform plan does not fight the scaler.
+#
+# Network: private_subnet_ids across ≥2 AZs. API tasks register their ENI IPs
+# into the ALB target group (stickiness OFF → even fan-out).
+#
+# DO NOT terraform apply until assessment day.
+
 resource "aws_ecs_cluster" "this" {
   name = "${var.name_prefix}-cluster"
 
@@ -103,6 +116,8 @@ resource "aws_ecs_task_definition" "worker" {
   tags = var.tags
 }
 
+# API service — registered with ALB TG; health via container /health.
+# Bootstrap desired_count should be ≥2 in prod for multi-AZ redundancy.
 resource "aws_ecs_service" "api" {
   name            = "${var.name_prefix}-api"
   cluster         = aws_ecs_cluster.this.id
@@ -111,6 +126,7 @@ resource "aws_ecs_service" "api" {
   launch_type     = "FARGATE"
 
   network_configuration {
+    # Spread across private subnets in multiple AZs (from VPC module).
     subnets          = var.private_subnet_ids
     security_groups  = [var.ecs_security_group_id]
     assign_public_ip = false
@@ -122,9 +138,12 @@ resource "aws_ecs_service" "api" {
     container_port   = 8000
   }
 
+  # Rolling deploy: keep ≥50% healthy while doubling capacity during rollout.
   deployment_minimum_healthy_percent = 50
   deployment_maximum_percent         = 200
+  health_check_grace_period_seconds  = var.api_health_check_grace_period_seconds
 
+  # Autoscaling owns DesiredCount after bootstrap — do not thrash on plan.
   lifecycle {
     ignore_changes = [desired_count]
   }
@@ -132,6 +151,8 @@ resource "aws_ecs_service" "api" {
   tags = var.tags
 }
 
+# Worker service — NOT load-balanced. Scale via autoscaling.tf (CPU/memory).
+# Raise desired_count / max_capacity for backlog; API scaling is independent.
 resource "aws_ecs_service" "worker" {
   name            = "${var.name_prefix}-worker"
   cluster         = aws_ecs_cluster.this.id

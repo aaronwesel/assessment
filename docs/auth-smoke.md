@@ -32,11 +32,11 @@ Providers: `GET http://localhost:8000/api/v1/auth/providers`
 ```bash
 curl -s -X POST http://localhost:8000/api/v1/auth/register \
   -H 'Content-Type: application/json' \
-  -d '{"email":"smoke@example.com","password":"securepass1","full_name":"Smoke"}'
+  -d '{"email":"smoke@example.com","password":"SecurePass1!x","full_name":"Smoke"}'
 
 curl -s -X POST http://localhost:8000/api/v1/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"email":"smoke@example.com","password":"securepass1"}'
+  -d '{"email":"smoke@example.com","password":"SecurePass1!x"}'
 
 # Use access_token from the response (do not commit it):
 curl -s http://localhost:8000/api/v1/auth/me -H "Authorization: Bearer $ACCESS"

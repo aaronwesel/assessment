@@ -1,4 +1,6 @@
 # Secret shells only — never commit real values. Populate on assessment day.
+# KMS-encrypted Secrets Manager entries feed ECS task secrets (JWT, DB, Redis,
+# optional Slack webhook). HIPAA: rotate values; keep PHI out of secret JSON keys.
 
 resource "aws_secretsmanager_secret" "app" {
   name       = "${var.name_prefix}/app"
@@ -28,6 +30,12 @@ resource "aws_secretsmanager_secret" "redis" {
 }
 
 # Placeholder version so secret ARNs resolve; replace before apply with real JSON.
+#
+# Slack Incoming Webhook (optional team handoffs / deploy alerts):
+# - Store the webhook URL here as SLACK_WEBHOOK_URL (never commit the real value).
+# - Keep SLACK_ENABLED="false" until the URL is populated and message templates
+#   are confirmed PHI-free (see docs/team-management.md).
+# - This is a secret-shell note only — do NOT terraform apply during prep.
 resource "aws_secretsmanager_secret_version" "app" {
   secret_id = aws_secretsmanager_secret.app.id
   secret_string = jsonencode({
@@ -37,6 +45,8 @@ resource "aws_secretsmanager_secret_version" "app" {
     DEEPSEEK_API_KEY            = "CHANGE_ME"
     FEATURE_DEEPSEEK_ENABLED    = "false"
     FEATURE_REKOGNITION_ENABLED = "false"
+    SLACK_WEBHOOK_URL           = "CHANGE_ME_INCOMING_WEBHOOK"
+    SLACK_ENABLED               = "false"
   })
 }
 

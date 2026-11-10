@@ -1,4 +1,13 @@
-"""Verify Microsoft Entra / MSAL ID tokens via JWKS."""
+"""
+Verify Microsoft Entra / MSAL ID tokens via tenant JWKS (RS256).
+
+The SPA uses `@azure/msal-browser` (popup) and POSTs the ID token to
+`/auth/microsoft/onetap`. We fetch keys from
+`login.microsoftonline.com/{tenant}/discovery/v2.0/keys`, match `kid`, and
+verify audience (= MICROSOFT_CLIENT_ID).
+
+HIPAA / PII: never log tokens or email/preferred_username claims.
+"""
 
 from __future__ import annotations
 
@@ -32,6 +41,7 @@ def _jwks_url(tenant_id: str) -> str:
 
 @lru_cache(maxsize=8)
 def _fetch_jwks(tenant_id: str) -> dict[str, Any]:
+    """Cache JWKS per tenant to avoid a network hop on every login."""
     url = _jwks_url(tenant_id)
     with httpx.Client(timeout=10.0) as client:
         response = client.get(url)

@@ -1,4 +1,10 @@
-"""Alembic environment — migrations run as a deploy step, not on API boot."""
+"""
+Alembic environment — migrations run as a deploy step, not on API boot.
+
+Online mode uses `DATABASE_URL` from Settings; offline mode emits SQL with
+literal binds. Models are registered via `app.db.base` so metadata matches the
+SQLModel tables (users, account_links).
+"""
 
 from __future__ import annotations
 

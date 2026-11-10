@@ -39,9 +39,9 @@ infra/
     modules/
       vpc/
       security/
-      alb/
+      alb/          # TG + stickiness OFF + multi-AZ notes
       ecr/
-      ecs/
+      ecs/          # services + autoscaling.tf (CPU/mem/requests)
       rds/
       redis/
       secrets/

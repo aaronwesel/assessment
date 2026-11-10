@@ -1,3 +1,10 @@
+/**
+ * Google Identity Services One Tap + button.
+ *
+ * Loads the GIS script, initializes with VITE_GOOGLE_CLIENT_ID, and on credential
+ * callback exchanges the GIS JWT with POST /api/v1/auth/google/onetap.
+ * The backend verifies the token; we never trust client-side decoding alone.
+ */
 import { useEffect, useRef, useState } from 'react'
 import { exchangeOneTap } from '../api/auth'
 import { useAuth } from '../auth/AuthContext'

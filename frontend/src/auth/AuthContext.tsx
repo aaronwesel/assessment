@@ -1,3 +1,13 @@
+/**
+ * React auth context: JWT session in sessionStorage + /auth/me hydration.
+ *
+ * Why sessionStorage (not localStorage): tokens clear when the tab closes,
+ * reducing XSS persistence risk on shared machines. Still not a substitute for
+ * HttpOnly cookies in a full production hardening pass — assessment scaffold.
+ *
+ * loginWithTokens: after any provider returns a TokenPair, fetch `/me` and persist.
+ * logout: best-effort API revoke (Redis blacklist) then clear local session.
+ */
 import {
   createContext,
   useCallback,

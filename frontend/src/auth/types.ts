@@ -1,3 +1,10 @@
+/**
+ * Shared auth types for the SPA.
+ *
+ * `AuthTokens` mirrors the FastAPI TokenPair (access + refresh JWTs).
+ * `AuthUser` is the hydrated `/auth/me` profile shown after login.
+ * Provider tracks which login path minted the current session.
+ */
 export type AuthProvider = 'password' | 'google' | 'microsoft'
 
 export type AuthTokens = {

@@ -1,4 +1,13 @@
-"""Amazon SES client via boto3. Feature flag OFF by default; prefer IAM task role in ECS."""
+"""
+Amazon SES client via boto3. Feature flag OFF by default; prefer IAM task role in ECS.
+
+Used for operational alerts (login/system), not transactional patient mail.
+`SES_ENABLED` + `SES_FROM_EMAIL` must both be set before any real SendEmail.
+Tests inject `StubSesClient` / protocol stubs instead of hitting AWS.
+
+HIPAA: never log recipients, subjects, or bodies — they must stay free of PHI
+(see `app.alerts.templates`). Prefer ECS task role over static access keys.
+"""
 
 from __future__ import annotations
 
@@ -146,6 +155,7 @@ class StubSesClient:
 
 
 def get_ses_client(settings: Settings | None = None) -> SesSender:
+    """Factory: live boto3 client only when SES is enabled and from-address is set."""
     cfg = settings or get_settings()
     if cfg.ses_enabled and cfg.ses_from_email:
         return Boto3SesClient(cfg)

@@ -13,6 +13,7 @@ terraform {
   }
 
   # PREP: local state only. Remote backend (S3 + DynamoDB) is assessment-day only.
+  # When enabling: bucket must use SSE-KMS (CMK) + block public access; keep encrypt=true.
   # backend "s3" {
   #   bucket         = "CHANGE_ME-tf-state"
   #   key            = "assessment/terraform.tfstate"

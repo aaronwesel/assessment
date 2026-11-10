@@ -1,4 +1,13 @@
-"""OAuth account-link table stub for Google / Microsoft One Tap identities."""
+"""
+OAuth / password account-link table for Google, Microsoft, and local identities.
+
+Maps a provider-specific subject (`sub` / oid / normalized email for password)
+onto our `users.id`. Unique on (provider, provider_subject) so the same Google
+account cannot bind to two users.
+
+Do not store ID tokens or extra PHI here — subject + provider is enough to
+re-resolve on subsequent One Tap exchanges.
+"""
 
 from datetime import datetime
 from enum import Enum

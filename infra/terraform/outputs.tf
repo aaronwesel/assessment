@@ -33,6 +33,22 @@ output "ecs_cluster_name" {
   value       = module.ecs.cluster_name
 }
 
+output "api_autoscaling_range" {
+  description = "API ECS autoscaling min/max capacity"
+  value = {
+    min = module.ecs.api_autoscaling_min
+    max = module.ecs.api_autoscaling_max
+  }
+}
+
+output "worker_autoscaling_range" {
+  description = "Worker ECS autoscaling min/max capacity"
+  value = {
+    min = module.ecs.worker_autoscaling_min
+    max = module.ecs.worker_autoscaling_max
+  }
+}
+
 output "rds_cluster_endpoint" {
   description = "Aurora/RDS writer endpoint"
   value       = module.rds.cluster_endpoint

@@ -1,5 +1,8 @@
-# Amazon SES identity + configuration set placeholders.
+# Amazon SES identity + configuration set placeholders for ops/login alerts.
 # DO NOT terraform apply until assessment day.
+#
+# App wiring: backend/app/clients/ses.py + alerts (LOGIN_ALERT_*). Bodies must
+# stay free of PHI; TLS is required on the configuration set.
 #
 # Assessment-day fill-ins:
 # - Verify domain (or email) identity in the account/region

@@ -1,3 +1,7 @@
+/**
+ * Top nav: brand link + sign-out when a JWT session is present.
+ * Sign-out triggers AuthContext.logout (API revoke + clear sessionStorage).
+ */
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 
