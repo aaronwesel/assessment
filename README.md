@@ -41,6 +41,8 @@ Compose builds the real FastAPI image from `backend/`. Frontend remains an http-
 
 Auth smoke (password + Google/Microsoft One Tap): see [docs/auth-smoke.md](docs/auth-smoke.md).
 
+Platform ops smoke (audit, break-glass, consent, flags, signed media, webhooks, health/SLO): see [docs/security-ops.md](docs/security-ops.md).
+
 ## Environment
 
 - Use `.env.example` as the contract. Put secrets in local `.env`, CI secrets, or AWS Secrets Manager — **never** in git.

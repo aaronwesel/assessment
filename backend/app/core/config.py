@@ -17,8 +17,6 @@ HIPAA / safety defaults:
 - DeepSeek, Rekognition, SES, and Slack are OFF unless explicitly enabled.
 - Login-alert recipients are ops mailboxes, not end-user PHI destinations.
 - Slack webhook bodies must stay PHI-free (opaque ids + event codes only).
-- Stripe keys (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`) stay in env /
-  Secrets Manager — never commit live or test secrets.
 """
 
 from functools import lru_cache
@@ -174,6 +172,48 @@ class Settings(BaseSettings):
     stripe_portal_return_url: str = Field(
         default="http://localhost:5173/billing",
         validation_alias=AliasChoices("STRIPE_PORTAL_RETURN_URL"),
+    )
+
+    # Break-glass emergency access (time-boxed admin overrides)
+    break_glass_default_ttl_minutes: int = Field(
+        default=60,
+        validation_alias="BREAK_GLASS_DEFAULT_TTL_MINUTES",
+    )
+    break_glass_max_ttl_minutes: int = Field(
+        default=24 * 60,
+        validation_alias="BREAK_GLASS_MAX_TTL_MINUTES",
+    )
+
+    # Signed media URLs (S3-minded stub). Prefer a dedicated signing secret in prod.
+    media_signing_secret: str = Field(
+        default="",
+        validation_alias=AliasChoices("MEDIA_SIGNING_SECRET"),
+    )
+    media_public_base_url: str = Field(
+        default="https://media.example.local/objects",
+        validation_alias="MEDIA_PUBLIC_BASE_URL",
+    )
+    media_signed_url_ttl_seconds: int = Field(
+        default=300,
+        validation_alias="MEDIA_SIGNED_URL_TTL_SECONDS",
+    )
+    media_signed_url_max_ttl_seconds: int = Field(
+        default=3600,
+        validation_alias="MEDIA_SIGNED_URL_MAX_TTL_SECONDS",
+    )
+
+    # Outbound webhook outbox (HMAC-signed deliveries)
+    webhooks_enabled: bool = Field(
+        default=True,
+        validation_alias="WEBHOOKS_ENABLED",
+    )
+    webhook_signing_secret: str = Field(
+        default="",
+        validation_alias=AliasChoices("WEBHOOK_SIGNING_SECRET"),
+    )
+    webhook_max_attempts: int = Field(
+        default=8,
+        validation_alias="WEBHOOK_MAX_ATTEMPTS",
     )
 
     @property
