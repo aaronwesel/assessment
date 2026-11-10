@@ -58,7 +58,7 @@ public sealed class FieldFinderService : IFieldFinderService
                 request.JobId,
                 heuristic,
                 UsedModel: false,
-                DegradedReason: "DEEPSEEK_API_KEY not configured; heuristic suggestions only.");
+                DegradedReason: AiDegradedCopy.OfflineHeuristicSuggestions);
         }
 
         var system = """

@@ -4,6 +4,7 @@
 import { useMemo, useState } from 'react'
 import type { PageNode } from '../../api/crawl'
 import { suggestFields, type FieldSuggestion } from '../../crawl/ai/crawlAiApi'
+import { formatDegradedReason } from '../../crawl/ai/aiStatus'
 import { flattenPageNodes } from '../../crawl/jobReport'
 
 type Props = {
@@ -43,7 +44,7 @@ export function ElementPickExport({ jobId, root }: Props) {
       setNote(
         resp.usedModel
           ? 'Confirm selectors before export — AI does not own crawl math.'
-          : resp.degradedReason ?? 'Heuristic suggestions only.',
+          : formatDegradedReason(resp.degradedReason) ?? 'Heuristic suggestions — confirm before use.',
       )
     } catch (e) {
       setNote((e as Error).message)
