@@ -18,6 +18,8 @@ public sealed class CrawlJobConfiguration : IEntityTypeConfiguration<CrawlJob>
         builder.Property(x => x.Status).HasConversion<string>().HasMaxLength(32).IsRequired();
         builder.Property(x => x.CreatedAt).IsRequired();
         builder.Property(x => x.FailureReason).HasMaxLength(CrawlJob.FailureReasonMaxLength);
+        builder.Property(x => x.AlertEmail).HasMaxLength(CrawlJob.AlertEmailMaxLength);
+        builder.Property(x => x.StatusAlertSent).HasDefaultValue(false);
 
         builder.HasIndex(x => x.CreatedAt);
         builder.HasIndex(x => x.Status);

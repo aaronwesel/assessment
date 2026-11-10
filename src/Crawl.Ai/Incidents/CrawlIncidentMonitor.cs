@@ -27,6 +27,7 @@ public sealed class CrawlIncidentMonitor(
     IRemediationAgent agent,
     ICrawlRemediationApplicator applicator,
     ICrawlAlertSender alerts,
+    IJobSubscriberAlertService subscriberAlerts,
     IOptions<CrawlAiOptions> aiOptions,
     IOptions<CrawlAlertOptions> alertOptions,
     ILogger<CrawlIncidentMonitor> logger) : ICrawlIncidentMonitor
@@ -70,6 +71,8 @@ public sealed class CrawlIncidentMonitor(
                 .ConfigureAwait(false);
             incident.ApplyRemediation(apply.Status, apply.Detail, advice.UsedModel, advice.Rationale, alertSent);
             await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            await TryNotifyJobSubscriberAsync(fault.JobId, incident, alertCode, cancellationToken)
+                .ConfigureAwait(false);
             return incident;
         }
 
@@ -85,7 +88,28 @@ public sealed class CrawlIncidentMonitor(
             advice.Kind,
             apply.Status);
 
+        if (shouldAlert)
+        {
+            await TryNotifyJobSubscriberAsync(fault.JobId, incident, alertCode, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
         return incident;
+    }
+
+    private async Task TryNotifyJobSubscriberAsync(
+        Guid jobId,
+        CrawlIncident incident,
+        string alertCode,
+        CancellationToken cancellationToken)
+    {
+        var job = await db.Jobs.AsNoTracking().FirstOrDefaultAsync(j => j.Id == jobId, cancellationToken)
+            .ConfigureAwait(false);
+        if (job is null || !job.HasAlertSubscription)
+            return;
+
+        await subscriberAlerts.TrySendIncidentAlertAsync(job, incident, alertCode, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyList<CrawlIncident>> ListForJobAsync(

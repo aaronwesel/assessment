@@ -103,6 +103,10 @@ namespace Crawl.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("AlertEmail")
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
                     b.Property<DateTimeOffset?>("CompletedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -126,6 +130,9 @@ namespace Crawl.Infrastructure.Persistence.Migrations
 
                     b.Property<DateTimeOffset?>("StartedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("StatusAlertSent")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Status")
                         .IsRequired()

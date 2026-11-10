@@ -1,3 +1,4 @@
+using Crawl.Ai.Alerts;
 using Crawl.Domain.Jobs;
 using Crawl.Domain.Links;
 using Crawl.Domain.Messaging;
@@ -15,6 +16,7 @@ namespace Crawl.Api.Jobs;
 public sealed class JobService(
     CrawlDbContext db,
     ICrawlMessagePublisher publisher,
+    IJobSubscriberAlertService subscriberAlerts,
     ILogger<JobService> logger)
 {
     public async Task<(CreateJobResponse? Response, string? Error)> CreateAsync(
@@ -137,7 +139,41 @@ public sealed class JobService(
 
         job.MarkCanceled(DateTimeOffset.UtcNow);
         await db.SaveChangesAsync(cancellationToken);
+        await subscriberAlerts.TrySendTerminalStatusAlertAsync(job, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
         logger.LogInformation("Canceled crawl job {JobId}", jobId);
         return (true, true, null);
+    }
+
+    public async Task<(bool Found, JobSummaryDto? Summary, string? Error)> SetAlertEmailAsync(
+        Guid jobId,
+        SetJobAlertEmailRequest request,
+        CancellationToken cancellationToken)
+    {
+        var job = await db.Jobs.FirstOrDefaultAsync(j => j.Id == jobId, cancellationToken);
+        if (job is null)
+            return (false, null, null);
+
+        try
+        {
+            job.SetAlertEmail(request.Email);
+        }
+        catch (ArgumentException ex)
+        {
+            return (true, null, ex.Message);
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        if (job.Status.IsTerminal() && job.HasAlertSubscription && !job.StatusAlertSent)
+        {
+            await subscriberAlerts.TrySendTerminalStatusAlertAsync(job, cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        var pages = await db.Pages.AsNoTracking()
+            .Where(p => p.JobId == jobId)
+            .ToListAsync(cancellationToken);
+        return (true, JobDtoMapper.ToSummary(job, pages), null);
     }
 }

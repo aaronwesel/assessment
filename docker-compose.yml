@@ -148,6 +148,9 @@ services:
       Crawl__Alerts__FromAddress: ${SES_FROM_EMAIL:-}
       Crawl__Alerts__ToAddress: ${CRAWL_ALERT_TO_EMAIL:-}
       Crawl__Alerts__Provider: ${CRAWL_ALERTS_PROVIDER:-stub}
+      Crawl__Alerts__SesRegion: ${SES_REGION:-}
+      SES_ENABLED: ${SES_ENABLED:-false}
+      SES_REGION: ${SES_REGION:-}
       CrawlEgress__Enabled: ${CRAWL_EGRESS_ENABLED:-false}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
       OTEL_SERVICE_NAME: crawl-api
@@ -196,6 +199,9 @@ services:
       Crawl__Alerts__FromAddress: ${SES_FROM_EMAIL:-}
       Crawl__Alerts__ToAddress: ${CRAWL_ALERT_TO_EMAIL:-}
       Crawl__Alerts__Provider: ${CRAWL_ALERTS_PROVIDER:-stub}
+      Crawl__Alerts__SesRegion: ${SES_REGION:-}
+      SES_ENABLED: ${SES_ENABLED:-false}
+      SES_REGION: ${SES_REGION:-}
       CrawlEgress__Enabled: ${CRAWL_EGRESS_ENABLED:-false}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
       OTEL_SERVICE_NAME: crawl-worker
