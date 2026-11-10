@@ -2035,6 +2035,48 @@ code {
   flex-shrink: 0;
 }
 
+.crawl-guide-pulse.is-offline {
+  background: var(--muted);
+  animation: none;
+}
+
+.crawl-guide-pulse.is-online {
+  background: var(--accent);
+}
+
+.crawl-guide-ai-status {
+  margin: 0.15rem 0 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+}
+
+.crawl-guide-ai-status.is-offline {
+  color: var(--accent);
+}
+
+.crawl-guide-ai-status.is-online {
+  color: var(--muted);
+}
+
+.crawl-guide-offline {
+  padding: 0.65rem 0.75rem;
+  border-radius: var(--radius);
+  border: 1px dashed color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg));
+  font-size: 0.88rem;
+}
+
+.crawl-guide-setup-steps {
+  margin: 0.35rem 0 0;
+  padding-left: 1.15rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.crawl-guide.is-ai-offline {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+}
+
 .crawl-guide-body {
   padding: 0.85rem 1rem 1rem;
   display: flex;

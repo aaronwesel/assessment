@@ -20,7 +20,7 @@ public sealed class CrawlAiOptions
     public bool IncidentMonitorEnabled { get; set; } = true;
 
     /// <summary>
-    /// DeepSeek API key. Prefer env DEEPSEEK_API_KEY; when empty, clients degrade gracefully.
+    /// DeepSeek API key (config, env, or *_FILE mounts). When empty, clients degrade with labeled heuristics.
     /// </summary>
     public string? DeepSeekApiKey { get; set; }
 

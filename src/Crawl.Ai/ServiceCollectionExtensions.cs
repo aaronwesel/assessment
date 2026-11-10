@@ -27,10 +27,7 @@ public static class ServiceCollectionExtensions
             .Bind(configuration.GetSection(CrawlAiOptions.SectionName))
             .PostConfigure(opts =>
             {
-                if (string.IsNullOrWhiteSpace(opts.DeepSeekApiKey))
-                {
-                    opts.DeepSeekApiKey = Environment.GetEnvironmentVariable("DEEPSEEK_API_KEY");
-                }
+                opts.DeepSeekApiKey = DeepSeekApiKeyResolver.Resolve(opts.DeepSeekApiKey);
             });
 
         services.AddOptions<CrawlAlertOptions>()

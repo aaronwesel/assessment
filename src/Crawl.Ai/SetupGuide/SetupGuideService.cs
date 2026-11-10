@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.RegularExpressions;
 using Crawl.Ai.DeepSeek;
+using static Crawl.Ai.DeepSeek.AiDegradedCopy;
 using Crawl.Ai.Models;
 namespace Crawl.Ai.SetupGuide;
 
@@ -121,7 +122,7 @@ public sealed class SetupGuideService(IHttpClientFactory httpClientFactory, IDee
         else if (!string.IsNullOrWhiteSpace(request.Question))
         {
             modelAnswer = HeuristicAnswer(request.Question, uri.AbsoluteUri, request.MaxDepth, likelyLogin);
-            degraded = "DEEPSEEK_API_KEY not configured; heuristic answer only.";
+            degraded = OfflineHeuristicAnswer;
         }
 
         return new SetupGuideResponse(

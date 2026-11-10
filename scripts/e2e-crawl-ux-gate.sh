@@ -18,6 +18,15 @@ curl -fsS -X POST "$API/api/ai/setup/preview" -H 'Content-Type: application/json
   | python3 -c "import sys,json; j=json.load(sys.stdin); assert j.get('urlValid') and j.get('reachable'), j" \
   || fail "setup preview"
 
+curl -fsS -X POST "$API/api/ai/setup/preview" -H 'Content-Type: application/json' \
+  -d '{"url":"https://books.toscrape.com","maxDepth":2,"wizardStep":1,"question":"is depth 2 ok?"}' \
+  | python3 -c "import sys,json; j=json.load(sys.stdin); body=json.dumps(j); assert j.get('modelAnswer'), j; assert 'DEEPSEEK_API_KEY' not in body and 'CrawlAi__' not in body, body" \
+  || fail "setup preview ask (no raw env names)"
+
+curl -fsS "$API/api/ai/features" \
+  | python3 -c "import sys,json; j=json.load(sys.stdin); assert 'deepSeekConfigured' in j, j" \
+  || fail "ai features"
+
 wait_job() {
   local id="$1" max="${2:-120}"
   local i=0 status=""

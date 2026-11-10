@@ -2,7 +2,17 @@
  * Persistent setup coach — server probe via /api/ai/setup/preview; degrades without DeepSeek key.
  */
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { fetchSetupPreview, type SetupPreviewResponse } from '../../crawl/ai/crawlAiApi'
+import {
+  fetchAiFeatures,
+  fetchSetupPreview,
+  type SetupPreviewResponse,
+} from '../../crawl/ai/crawlAiApi'
+import {
+  AI_OFFLINE_SETUP_STEPS,
+  answerSourceLabel,
+  assistiveAiHeadline,
+  formatDegradedReason,
+} from '../../crawl/ai/aiStatus'
 import { STEP_LABELS } from './CrawlFlowSteps'
 
 type Props = {
@@ -18,7 +28,23 @@ export function DeepSeekGuide({ step, url, maxDepth, collapsed }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [question, setQuestion] = useState('')
   const [answer, setAnswer] = useState<string | null>(null)
+  const [answerUsedModel, setAnswerUsedModel] = useState(false)
   const [panelOpen, setPanelOpen] = useState(!collapsed)
+  const [aiOnline, setAiOnline] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    fetchAiFeatures()
+      .then((f) => {
+        if (!cancelled) setAiOnline(f.deepSeekConfigured)
+      })
+      .catch(() => {
+        if (!cancelled) setAiOnline(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const refresh = useCallback(
     async (q?: string) => {
@@ -36,7 +62,10 @@ export function DeepSeekGuide({ step, url, maxDepth, collapsed }: Props) {
           question: q,
         })
         setPreview(resp)
-        if (q && resp.modelAnswer) setAnswer(resp.modelAnswer)
+        if (q && resp.modelAnswer) {
+          setAnswer(resp.modelAnswer)
+          setAnswerUsedModel(resp.usedModel)
+        }
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Guide unavailable')
       } finally {
@@ -58,19 +87,27 @@ export function DeepSeekGuide({ step, url, maxDepth, collapsed }: Props) {
   }
 
   const stepTitle = STEP_LABELS[step] ?? 'Guide'
+  const online = aiOnline === true
+  const offline = aiOnline === false
+  const degradedHint = formatDegradedReason(preview?.degradedReason)
 
   return (
     <aside
-      className={`crawl-guide${panelOpen ? ' is-open' : ' is-collapsed'}`}
+      className={`crawl-guide${panelOpen ? ' is-open' : ' is-collapsed'}${offline ? ' is-ai-offline' : ''}`}
       aria-label="DeepSeek crawl guide"
     >
       <header className="crawl-guide-head">
-        <MotionDot />
+        <MotionDot online={online} />
         <div>
           <h2 className="crawl-guide-title">Crawl guide</h2>
           <p className="hint crawl-guide-step">
             Step {step + 1}: {stepTitle}
           </p>
+          {aiOnline != null ? (
+            <p className={`crawl-guide-ai-status${online ? ' is-online' : ' is-offline'}`} role="status">
+              {assistiveAiHeadline(online)}
+            </p>
+          ) : null}
         </div>
         <button
           type="button"
@@ -84,6 +121,21 @@ export function DeepSeekGuide({ step, url, maxDepth, collapsed }: Props) {
 
       {panelOpen ? (
         <div className="crawl-guide-body">
+          {offline ? (
+            <div className="crawl-guide-offline" role="note">
+              <p>
+                AI coaching is in <strong>offline</strong> mode — server probes and labeled heuristics still work. Link
+                parsing and Domain Link Ratio stay in .NET either way.
+              </p>
+              <p className="hint">Turn AI on:</p>
+              <ol className="crawl-guide-setup-steps">
+                {AI_OFFLINE_SETUP_STEPS.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ol>
+            </div>
+          ) : null}
+
           <p className="crawl-guide-lede">{preview?.stepAdvice ?? friendlyStepCopy(step)}</p>
 
           {loading ? <p className="hint">Checking your site…</p> : null}
@@ -106,11 +158,9 @@ export function DeepSeekGuide({ step, url, maxDepth, collapsed }: Props) {
 
           {answer ? (
             <div className="crawl-guide-answer">
-              <span className="crawl-guide-answer-label">Answer</span>
+              <span className="crawl-guide-answer-label">{answerSourceLabel(answerUsedModel)}</span>
               <p>{answer}</p>
-              {preview?.degradedReason ? (
-                <p className="hint">{preview.degradedReason}</p>
-              ) : null}
+              {degradedHint ? <p className="hint">{degradedHint}</p> : null}
             </div>
           ) : null}
 
@@ -139,8 +189,13 @@ export function DeepSeekGuide({ step, url, maxDepth, collapsed }: Props) {
   )
 }
 
-function MotionDot() {
-  return <span className="crawl-guide-pulse" aria-hidden="true" />
+function MotionDot({ online }: { online: boolean | null }) {
+  return (
+    <span
+      className={`crawl-guide-pulse${online === false ? ' is-offline' : online ? ' is-online' : ''}`}
+      aria-hidden="true"
+    />
+  )
 }
 
 function friendlyStepCopy(step: number): string {

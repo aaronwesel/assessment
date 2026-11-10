@@ -19,6 +19,7 @@ import {
   type FieldSuggestion,
   type IncidentRemediation,
 } from './crawlAiApi'
+import { assistiveAiHeadline, formatDegradedReason } from './aiStatus'
 import './ai-assist.css'
 
 type Props = {
@@ -75,8 +76,8 @@ export function AiAssistPanels(props: Props) {
       <header className="crawl-ai__header">
         <h2>Assistive AI</h2>
         <p>
-          Operator confirmations required. Crawl graph math stays in .NET
-          {flags.deepSeekConfigured ? '' : ' · DeepSeek key missing (heuristic mode)'}.
+          Operator confirmations required. Crawl graph math stays in .NET ·{' '}
+          {assistiveAiHeadline(flags.deepSeekConfigured)}.
         </p>
       </header>
 
@@ -215,7 +216,7 @@ function FieldFinderPanel({
       setNote(
         resp.usedModel
           ? 'Model suggestions — confirm before saving extraction hints.'
-          : resp.degradedReason ?? 'Heuristic suggestions — confirm before use.',
+          : formatDegradedReason(resp.degradedReason) ?? 'Heuristic suggestions — confirm before use.',
       )
     } catch (e) {
       setNote((e as Error).message)

@@ -35,7 +35,7 @@ public sealed class RemediationAgent(
 
         if (!deepSeek.IsConfigured)
         {
-            return new RemediationAdvice(fallback, fallbackRationale, false, "DEEPSEEK_API_KEY not configured; using policy.");
+            return new RemediationAdvice(fallback, fallbackRationale, false, AiDegradedCopy.OfflinePolicy);
         }
 
         var system =
