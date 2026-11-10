@@ -29,4 +29,9 @@
     <ProjectReference Include="..\..\src\Crawl.Worker\Crawl.Worker.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="fixtures\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
+

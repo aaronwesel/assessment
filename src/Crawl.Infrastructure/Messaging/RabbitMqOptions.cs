@@ -1,0 +1,16 @@
+namespace Crawl.Infrastructure.Messaging;
+
+public sealed class RabbitMqOptions
+{
+    public const string SectionName = "RabbitMq";
+
+    public string HostName { get; set; } = "localhost";
+    public int Port { get; set; } = 5672;
+    public string UserName { get; set; } = "guest";
+    public string Password { get; set; } = "guest";
+    public string VirtualHost { get; set; } = "/";
+    public string PageQueue { get; set; } = "crawl.page";
+    public string PageDlq { get; set; } = "crawl.page.dlq";
+    public int PrefetchCount { get; set; } = 8;
+    public int MaxRetryAttempts { get; set; } = 3;
+}

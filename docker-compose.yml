@@ -99,9 +99,91 @@ services:
       - "${FRONTEND_PORT:-3000}:3000"
     environment:
       VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+      VITE_CRAWL_API_BASE_URL: ${VITE_CRAWL_API_BASE_URL:-http://localhost:8080}
     depends_on:
       api:
         condition: service_healthy
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    restart: unless-stopped
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_UI_PORT:-15672}:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  crawl-api:
+    build:
+      context: .
+      dockerfile: src/Crawl.Api/Dockerfile
+    image: assessment-crawl-api:local
+    restart: unless-stopped
+    ports:
+      - "${CRAWL_API_PORT:-8080}:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ConnectionStrings__Crawl: ${CRAWL_DATABASE_URL:-Host=db;Port=5432;Database=${POSTGRES_DB:-app};Username=${POSTGRES_USER:-app};Password=${POSTGRES_PASSWORD:-changeme-local-only}}
+      RabbitMq__HostName: rabbitmq
+      RabbitMq__Port: 5672
+      RabbitMq__UserName: ${RABBITMQ_USER:-guest}
+      RabbitMq__Password: ${RABBITMQ_PASSWORD:-guest}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://127.0.0.1:8080/health >/dev/null || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 25s
+
+  crawl-worker:
+    build:
+      context: .
+      dockerfile: src/Crawl.Worker/Dockerfile
+    image: assessment-crawl-worker:local
+    restart: unless-stopped
+    ports:
+      - "${CRAWL_WORKER_PORT:-8081}:8081"
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ConnectionStrings__Crawl: ${CRAWL_DATABASE_URL:-Host=db;Port=5432;Database=${POSTGRES_DB:-app};Username=${POSTGRES_USER:-app};Password=${POSTGRES_PASSWORD:-changeme-local-only}}
+      RabbitMq__HostName: rabbitmq
+      RabbitMq__Port: 5672
+      RabbitMq__UserName: ${RABBITMQ_USER:-guest}
+      RabbitMq__Password: ${RABBITMQ_PASSWORD:-guest}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      crawl-api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://127.0.0.1:8081/health >/dev/null || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 25s
 
 volumes:
   postgres_data:

@@ -6,13 +6,15 @@ Production-oriented, HIPAA-ready SaaS scaffold (FastAPI · React · Terraform �
 
 | Path | Purpose |
 |------|---------|
-| `backend/` | FastAPI API, workers, Alembic, tests |
-| `frontend/` | Simple React/Vite web UI |
+| `src/` | Graded .NET 8 crawl stack (`Crawl.Api`, `Crawl.Worker`, Domain, Infrastructure) |
+| `tests/` | Crawl unit + HTML fixture integration tests |
+| `backend/` | FastAPI platform API (auth, billing, flags) — side-by-side with crawl |
+| `frontend/` | React/Vite web UI |
 | `apps/android/` | Android client (same API/auth) |
 | `apps/ios/` | Apple/iOS client (same API/auth) |
 | `infra/terraform/` | AWS IaC (ECS, ALB, Aurora/RDS, Redis, KMS, etc.) — **never apply from CI** |
-| `docs/` | HIPAA checklist, assessment-day runbook, team management / workstreams |
-| `docker-compose.yml` | Local parity: api, db, redis, frontend |
+| `docs/` | HIPAA checklist, assessment-day runbook, crawl runbook, workstreams |
+| `docker-compose.yml` | Local parity: platform api, crawl-api, crawl-worker, db, redis, rabbitmq, frontend |
 
 ## Quick start (local)
 
@@ -32,12 +34,17 @@ Production-oriented, HIPAA-ready SaaS scaffold (FastAPI · React · Terraform �
 
    | Service | Default URL / check |
    |---------|---------------------|
-   | API | `GET http://localhost:8000/health` → `200` |
+   | Platform API | `GET http://localhost:8000/health` → `200` |
+   | Crawl API | `GET http://localhost:8080/health` · Swagger `/swagger` |
+   | Crawl Worker | `GET http://localhost:8081/health` |
    | Frontend | `http://localhost:3000` (stub until `frontend/Dockerfile`); use `cd frontend && npm run dev` for real auth UI |
    | Postgres | `postgres://app:changeme-local-only@localhost:5432/app` (Compose only) |
    | Redis | `redis://localhost:6379/0` |
+   | RabbitMQ | `http://localhost:15672` (guest/guest) |
 
-Compose builds the real FastAPI image from `backend/`. Frontend remains an http-echo stub until `frontend/Dockerfile` lands.
+Compose builds the FastAPI platform image from `backend/` and the .NET crawl images from `src/`. Frontend remains an http-echo stub until `frontend/Dockerfile` lands.
+
+Crawl details (message schema, idempotency, retries/DLQ): [docs/crawl.md](docs/crawl.md).
 
 Auth smoke (password + Google/Microsoft One Tap): see [docs/auth-smoke.md](docs/auth-smoke.md).
 
