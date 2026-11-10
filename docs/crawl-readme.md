@@ -14,6 +14,8 @@ cp .env.example .env
 docker compose up --build
 ```
 
+On Cloud Agent VMs where Docker **bridge container↔container TCP is broken**, Compose uses `network_mode: host` for `api` / `crawl-api` / `crawl-worker` / `frontend`, talking to published `127.0.0.1:5432` / `:5672`. Data-plane images (`db`, `redis`, `rabbitmq`) stay bridged with published ports.
+
 Optional OpenTelemetry collector (debug exporter):
 
 ```bash

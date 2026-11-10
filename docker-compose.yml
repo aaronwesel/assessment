@@ -1,6 +1,10 @@
 # Local stack: platform FastAPI + Crawl (.NET API/Worker) + shared data plane.
 # Crawl shape mirrors cloud: ECS + Aurora Postgres + Amazon MQ (RabbitMQ) + SPA.
 # No secrets committed — copy .env.example → .env.
+#
+# NOTE: On some Cloud Agent VMs, Docker bridge container↔container TCP is broken.
+# Data plane (db/redis/rabbitmq) stays bridged with published ports; app processes
+# use network_mode: host and talk to 127.0.0.1:<published-port>.
 
 services:
   db:
@@ -14,7 +18,6 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      # Optional second DB `crawl` (appsettings default). Compose defaults still use `app`.
       - ./docker/postgres-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-app} -d ${POSTGRES_DB:-app}"]
@@ -55,31 +58,30 @@ services:
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.114.0
     profiles: ["otel"]
+    network_mode: host
     restart: unless-stopped
     command: ["--config=/etc/otelcol/config.yaml"]
     volumes:
       - ./infra/otel/otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
-    ports:
-      - "${OTEL_COLLECTOR_GRPC_PORT:-4317}:4317"
-      - "${OTEL_COLLECTOR_HTTP_PORT:-4318}:4318"
 
-  # Platform A (prep FastAPI) — differentiator alongside the graded crawl path.
+  # Platform A (prep FastAPI) — host network → published db/redis ports.
   api:
     build:
       context: ./backend
       dockerfile: Dockerfile
     image: assessment-api:local
+    network_mode: host
     restart: unless-stopped
-    ports:
-      - "${API_PORT:-8000}:8000"
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://app:changeme-local-only@db:5432/app}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://app:changeme-local-only@127.0.0.1:5432/app}
+      REDIS_URL: ${REDIS_URL:-redis://127.0.0.1:6379/0}
       ENVIRONMENT: ${ENVIRONMENT:-local}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
       JWT_SECRET: ${JWT_SECRET:-replace-with-local-secret}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-15}
       REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      API_HOST: 0.0.0.0
+      API_PORT: ${API_PORT:-8000}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
@@ -120,22 +122,20 @@ services:
       retries: 10
       start_period: 15s
 
-  # Crawl.Api (.NET 8) — create / status / tree / history / cancel / health (+ assistive AI).
+  # Crawl.Api — host network against published Postgres/RabbitMQ.
   crawl-api:
     build:
       context: .
       dockerfile: src/Crawl.Api/Dockerfile
     image: assessment-crawl-api:local
+    network_mode: host
     restart: unless-stopped
-    ports:
-      - "${CRAWL_API_PORT:-8080}:8080"
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
-      ASPNETCORE_URLS: http://+:8080
-      # Same Postgres instance as platform; crawl_* tables (see docs/crawl.md). Override to Database=crawl if desired.
-      ConnectionStrings__Crawl: ${CRAWL_DATABASE_URL:-Host=db;Port=5432;Database=${POSTGRES_DB:-app};Username=${POSTGRES_USER:-app};Password=${POSTGRES_PASSWORD:-changeme-local-only}}
-      RabbitMq__HostName: rabbitmq
-      RabbitMq__Port: "5672"
+      ASPNETCORE_URLS: http://0.0.0.0:${CRAWL_API_PORT:-8080}
+      ConnectionStrings__Crawl: ${CRAWL_DATABASE_URL:-Host=127.0.0.1;Port=5432;Database=${POSTGRES_DB:-app};Username=${POSTGRES_USER:-app};Password=${POSTGRES_PASSWORD:-changeme-local-only}}
+      RabbitMq__HostName: 127.0.0.1
+      RabbitMq__Port: "${RABBITMQ_PORT:-5672}"
       RabbitMq__UserName: ${RABBITMQ_USER:-guest}
       RabbitMq__Password: ${RABBITMQ_PASSWORD:-guest}
       RabbitMq__PageQueue: ${CRAWL_QUEUE:-crawl.page}
@@ -163,22 +163,20 @@ services:
       retries: 12
       start_period: 40s
 
-  # Crawl.Worker (.NET 8) — competing consumers; HTML fetch/parse; idempotent upserts.
-  # Scale: docker compose up --scale crawl-worker=2
+  # Crawl.Worker — host network; scale carefully (shared host ports).
   crawl-worker:
     build:
       context: .
       dockerfile: src/Crawl.Worker/Dockerfile
     image: assessment-crawl-worker:local
+    network_mode: host
     restart: unless-stopped
-    ports:
-      - "${CRAWL_WORKER_PORT:-8081}:8081"
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
-      ASPNETCORE_URLS: http://+:8081
-      ConnectionStrings__Crawl: ${CRAWL_DATABASE_URL:-Host=db;Port=5432;Database=${POSTGRES_DB:-app};Username=${POSTGRES_USER:-app};Password=${POSTGRES_PASSWORD:-changeme-local-only}}
-      RabbitMq__HostName: rabbitmq
-      RabbitMq__Port: "5672"
+      ASPNETCORE_URLS: http://0.0.0.0:${CRAWL_WORKER_PORT:-8081}
+      ConnectionStrings__Crawl: ${CRAWL_DATABASE_URL:-Host=127.0.0.1;Port=5432;Database=${POSTGRES_DB:-app};Username=${POSTGRES_USER:-app};Password=${POSTGRES_PASSWORD:-changeme-local-only}}
+      RabbitMq__HostName: 127.0.0.1
+      RabbitMq__Port: "${RABBITMQ_PORT:-5672}"
       RabbitMq__UserName: ${RABBITMQ_USER:-guest}
       RabbitMq__Password: ${RABBITMQ_PASSWORD:-guest}
       RabbitMq__PageQueue: ${CRAWL_QUEUE:-crawl.page}
@@ -221,12 +219,11 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
-        # Browser → host-mapped Crawl.Api. Use http://localhost:5059 for Vite + `dotnet run`.
         VITE_CRAWL_API_URL: ${VITE_CRAWL_API_URL:-http://localhost:8080}
     image: assessment-frontend:local
+    network_mode: host
     restart: unless-stopped
-    ports:
-      - "${FRONTEND_PORT:-3000}:3000"
+    # nginx listens on 3000 (see frontend/nginx.conf)
     depends_on:
       crawl-api:
         condition: service_healthy
