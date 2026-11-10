@@ -88,7 +88,8 @@ export function useJobRealtime(opts: {
 
     const hubUrl = `${config.crawlApiBaseUrl.replace(/\/$/, '')}/hubs/crawl-jobs`
     const connection = new HubConnectionBuilder()
-      .withUrl(hubUrl)
+      // Anonymous hub + API CORS AllowAnyOrigin cannot pair with credentials:include.
+      .withUrl(hubUrl, { withCredentials: false })
       .withAutomaticReconnect([0, 1000, 2000, 5000, 10000])
       .configureLogging(LogLevel.Warning)
       .build()

@@ -64,8 +64,16 @@ try
 
     builder.Services.AddCors(options =>
     {
+        // Named origins + credentials so SignalR negotiate works from the Vite/SPA hosts.
+        // (Browser rejects Access-Control-Allow-Origin: * when credentials mode is include.)
+        var origins = (builder.Configuration["Cors:Origins"]
+                ?? "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173")
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         options.AddDefaultPolicy(policy =>
-            policy.AllowAnyHeader().AllowAnyMethod().AllowAnyOrigin());
+            policy.WithOrigins(origins)
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .AllowCredentials());
     });
 
     var app = builder.Build();
