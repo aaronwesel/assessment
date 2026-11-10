@@ -1,10 +1,13 @@
 using System.Diagnostics;
 using Crawl.Ai;
 using Crawl.Api.Jobs;
+using Crawl.Api.Middleware;
 using Crawl.Infrastructure;
 using Crawl.Infrastructure.Messaging;
 using Crawl.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Serilog;
@@ -26,7 +29,7 @@ try
         .WriteTo.Console());
 
     builder.Services.AddCrawlInfrastructure(builder.Configuration);
-    // Assistive AI overlays — additive; never owns link parse / Domain Link Ratio.
+    builder.Services.AddCrawlMassTransitPublisher(builder.Configuration);
     builder.Services.AddCrawlAi(builder.Configuration);
     builder.Services.AddScoped<JobService>();
     builder.Services.AddEndpointsApiExplorer();
@@ -35,16 +38,7 @@ try
         options.SwaggerDoc("v1", new() { Title = "Crawl API", Version = "v1" });
     });
 
-    var rabbit = builder.Configuration.GetSection(RabbitMqOptions.SectionName).Get<RabbitMqOptions>()
-        ?? new RabbitMqOptions();
-    var crawlCs = builder.Configuration.GetConnectionString("Crawl")
-        ?? throw new InvalidOperationException("ConnectionStrings:Crawl is required.");
-
-    builder.Services.AddHealthChecks()
-        .AddNpgSql(crawlCs, name: "postgres")
-        .AddRabbitMQ(
-            $"amqp://{Uri.EscapeDataString(rabbit.UserName)}:{Uri.EscapeDataString(rabbit.Password)}@{rabbit.HostName}:{rabbit.Port}{rabbit.VirtualHost}",
-            name: "rabbitmq");
+    builder.Services.AddCrawlHealthChecks(builder.Configuration);
 
     builder.Services.AddOpenTelemetry()
         .ConfigureResource(r => r.AddService("Crawl.Api"))
@@ -52,9 +46,10 @@ try
         {
             t.AddAspNetCoreInstrumentation()
                 .AddHttpClientInstrumentation()
-                .AddSource("Crawl.Api");
+                .AddEntityFrameworkCoreInstrumentation()
+                .AddSource("Crawl.Api")
+                .AddSource("MassTransit");
 
-            // Hook is always registered; export only when an endpoint is configured.
             if (!string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]))
                 t.AddOtlpExporter();
         });
@@ -73,6 +68,7 @@ try
         await db.Database.MigrateAsync();
     }
 
+    app.UseMiddleware<CorrelationIdMiddleware>();
     app.UseSerilogRequestLogging();
     app.UseCors();
     app.UseSwagger();
@@ -162,7 +158,25 @@ try
 
     app.MapCrawlAi();
 
-    app.MapHealthChecks("/health");
+    // Liveness: process up. Readiness: Postgres + RabbitMQ. Keep /health as ready for Compose.
+    app.MapHealthChecks("/health/live", new HealthCheckOptions
+    {
+        Predicate = check => check.Tags.Contains("live"),
+        ResultStatusCodes =
+        {
+            [HealthStatus.Healthy] = StatusCodes.Status200OK,
+            [HealthStatus.Degraded] = StatusCodes.Status200OK,
+            [HealthStatus.Unhealthy] = StatusCodes.Status503ServiceUnavailable
+        }
+    });
+    app.MapHealthChecks("/health/ready", new HealthCheckOptions
+    {
+        Predicate = check => check.Tags.Contains("ready")
+    });
+    app.MapHealthChecks("/health", new HealthCheckOptions
+    {
+        Predicate = check => check.Tags.Contains("ready")
+    });
     app.MapGet("/", () => Results.Redirect("/swagger"));
 
     await app.RunAsync();

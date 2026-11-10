@@ -222,6 +222,10 @@ namespace Crawl.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("SourcePageId");
+
+                    b.HasIndex("TargetUrl");
+
                     b.HasIndex("SourcePageId", "TargetUrl")
                         .IsUnique();
 

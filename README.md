@@ -35,8 +35,8 @@ Job-based **web crawler** (.NET 8 API + Worker · RabbitMQ · Postgres · React)
 
    | Service | Default URL / check |
    |---------|---------------------|
-   | Crawl API | `GET http://localhost:8080/health` · Swagger `/swagger` |
-   | Crawl Worker | `GET http://localhost:8081/health` |
+   | Crawl API | `GET /health/live` · `/health/ready` · Swagger `/swagger` |
+   | Crawl Worker | `GET /health/live` · `/health/ready` (Postgres + RabbitMQ) |
    | Frontend | `http://localhost:3000` (`/crawl`, `/crawl/history`) |
    | RabbitMQ | `http://localhost:15672` (guest/guest by default) |
    | Platform API | `GET http://localhost:8000/health` |

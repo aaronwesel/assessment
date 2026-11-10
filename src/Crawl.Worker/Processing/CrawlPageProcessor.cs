@@ -13,12 +13,12 @@ using Crawl.Worker.Fetching;
 using Crawl.Worker.Metrics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using Npgsql;
 
 namespace Crawl.Worker.Processing;
 
 public sealed class CrawlPageProcessor(
     CrawlDbContext db,
+    PageUpsertStore pageUpserts,
     HtmlPageFetcher fetcher,
     HtmlLinkExtractor linkExtractor,
     ICrawlMessagePublisher publisher,
@@ -120,8 +120,8 @@ public sealed class CrawlPageProcessor(
         var links = linkExtractor.Extract(fetch.Html, parseBase, normalizeOptions);
         var startHost = job.StartHost;
         var internalCount = 0;
-        var edges = new List<PageEdge>();
         var childCandidates = new List<Uri>();
+        var edgeRows = new List<(string TargetUrl, bool IsInternal)>();
 
         foreach (var link in links)
         {
@@ -132,13 +132,11 @@ public sealed class CrawlPageProcessor(
                 childCandidates.Add(link);
             }
 
-            edges.Add(PageEdge.Create(page.Id, link, isInternal));
+            edgeRows.Add((link.AbsoluteUri, isInternal));
         }
 
-        // Replace edges idempotently: delete existing then insert (unique index guards races).
-        var existingEdges = await db.Edges.Where(e => e.SourcePageId == page.Id).ToListAsync(cancellationToken);
-        db.Edges.RemoveRange(existingEdges);
-        db.Edges.AddRange(edges);
+        // Idempotent edge replace: DELETE + INSERT … ON CONFLICT DO NOTHING.
+        await pageUpserts.ReplaceEdgesIdempotentAsync(page.Id, edgeRows, cancellationToken);
 
         page.MarkDone(links.Count, internalCount, now);
         CrawlWorkerMetrics.PagesProcessed.Add(1);
@@ -187,7 +185,7 @@ public sealed class CrawlPageProcessor(
             .ToListAsync(cancellationToken);
         var known = existingUrls.ToHashSet(StringComparer.Ordinal);
         var remaining = job.RemainingPageSlots(known.Count);
-        var inserted = new List<CrawlPage>();
+        var toInsert = new List<Uri>();
 
         foreach (var childUrl in childCandidates)
         {
@@ -196,35 +194,28 @@ public sealed class CrawlPageProcessor(
             if (!known.Add(childUrl.AbsoluteUri))
                 continue;
 
-            var child = CrawlPage.CreateChild(job.Id, parent.Id, parent.Depth + 1, childUrl, now);
-            db.Pages.Add(child);
-            inserted.Add(child);
+            toInsert.Add(childUrl);
             remaining--;
         }
 
-        if (inserted.Count == 0)
+        if (toInsert.Count == 0)
             return [];
 
-        try
-        {
-            await db.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateException ex) when (IsUniqueViolation(ex))
-        {
-            logger.LogDebug(ex, "Race inserting children for job {JobId}; reloading known URLs", job.Id);
-            foreach (var entry in db.ChangeTracker.Entries<CrawlPage>().Where(e => e.State == EntityState.Added))
-                entry.State = EntityState.Detached;
+        // INSERT … ON CONFLICT (JobId, Url) DO NOTHING RETURNING — safe under multi-worker races.
+        var inserted = await pageUpserts.UpsertQueuedChildrenAsync(
+            job.Id,
+            parent.Id,
+            parent.Depth + 1,
+            toInsert,
+            now,
+            cancellationToken);
 
-            // Best-effort: only publish pages that actually exist and are still queued under this parent.
-            var queuedChildren = await db.Pages.AsNoTracking()
-                .Where(p => p.JobId == job.Id && p.ParentPageId == parent.Id && p.Status == CrawlPageStatus.Queued)
-                .OrderBy(p => p.Url)
-                .ToListAsync(cancellationToken);
-
-            return queuedChildren
-                .Select(c => new CrawlPageRequested(job.Id, c.Id, c.Url, c.Depth, now))
-                .ToList();
-        }
+        logger.LogDebug(
+            "Upserted {Inserted}/{Attempted} child pages for JobId={JobId} parent={ParentPageId}",
+            inserted.Count,
+            toInsert.Count,
+            job.Id,
+            parent.Id);
 
         return inserted
             .Select(c => new CrawlPageRequested(job.Id, c.Id, c.Url, c.Depth, now))
@@ -275,6 +266,4 @@ public sealed class CrawlPageProcessor(
         }
     }
 
-    private static bool IsUniqueViolation(DbUpdateException ex) =>
-        ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation };
 }

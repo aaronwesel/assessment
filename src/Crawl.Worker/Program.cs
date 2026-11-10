@@ -5,7 +5,9 @@ using Crawl.Infrastructure.Persistence;
 using Crawl.Worker.Fetching;
 using Crawl.Worker.Metrics;
 using Crawl.Worker.Processing;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -27,29 +29,21 @@ try
         .WriteTo.Console());
 
     builder.Services.AddCrawlInfrastructure(builder.Configuration);
-    // Stretch: incident monitor + DeepSeek remediation agent (does not own link parsing).
+    builder.Services.AddCrawlMassTransitWorker<CrawlPageRequestedConsumer>(builder.Configuration);
     builder.Services.AddCrawlAi(builder.Configuration);
     builder.Services.AddScoped<HtmlPageFetcher>();
     builder.Services.AddScoped<CrawlPageProcessor>();
-    builder.Services.AddHostedService<CrawlPageConsumer>();
 
-    var rabbit = builder.Configuration.GetSection(RabbitMqOptions.SectionName).Get<RabbitMqOptions>()
-        ?? new RabbitMqOptions();
-    var crawlCs = builder.Configuration.GetConnectionString("Crawl")
-        ?? throw new InvalidOperationException("ConnectionStrings:Crawl is required.");
-
-    builder.Services.AddHealthChecks()
-        .AddNpgSql(crawlCs, name: "postgres")
-        .AddRabbitMQ(
-            $"amqp://{Uri.EscapeDataString(rabbit.UserName)}:{Uri.EscapeDataString(rabbit.Password)}@{rabbit.HostName}:{rabbit.Port}{rabbit.VirtualHost}",
-            name: "rabbitmq");
+    builder.Services.AddCrawlHealthChecks(builder.Configuration);
 
     builder.Services.AddOpenTelemetry()
         .ConfigureResource(r => r.AddService("Crawl.Worker"))
         .WithTracing(t =>
         {
             t.AddHttpClientInstrumentation()
-                .AddSource("Crawl.Worker");
+                .AddEntityFrameworkCoreInstrumentation()
+                .AddSource("Crawl.Worker")
+                .AddSource("MassTransit");
 
             if (!string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]))
                 t.AddOtlpExporter();
@@ -69,8 +63,25 @@ try
         await db.Database.MigrateAsync();
     }
 
-    app.MapHealthChecks("/health");
-    app.MapGet("/", () => Results.Ok(new { service = "Crawl.Worker", status = "ok" }));
+    app.MapHealthChecks("/health/live", new HealthCheckOptions
+    {
+        Predicate = check => check.Tags.Contains("live"),
+        ResultStatusCodes =
+        {
+            [HealthStatus.Healthy] = StatusCodes.Status200OK,
+            [HealthStatus.Degraded] = StatusCodes.Status200OK,
+            [HealthStatus.Unhealthy] = StatusCodes.Status503ServiceUnavailable
+        }
+    });
+    app.MapHealthChecks("/health/ready", new HealthCheckOptions
+    {
+        Predicate = check => check.Tags.Contains("ready")
+    });
+    app.MapHealthChecks("/health", new HealthCheckOptions
+    {
+        Predicate = check => check.Tags.Contains("ready")
+    });
+    app.MapGet("/", () => Results.Ok(new { service = "Crawl.Worker", status = "ok", bus = "MassTransit" }));
 
     await app.RunAsync();
 }
