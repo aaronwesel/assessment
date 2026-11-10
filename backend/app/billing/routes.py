@@ -13,6 +13,7 @@ from sqlmodel import func, select
 
 from app.api.deps import CurrentAuth, RequireAdmin, SessionDep
 from app.billing import client as stripe_client
+from app.billing import crawl_usage as crawl_usage_service
 from app.billing import service as billing_service
 from app.billing import webhooks as webhook_service
 from app.billing.models import BillingCustomer, BillingSubscription, SubscriptionStatus
@@ -22,8 +23,11 @@ from app.billing.schemas import (
     BillingSummaryResponse,
     CheckoutSessionRequest,
     CheckoutSessionResponse,
+    CrawlUsageStatusResponse,
     PortalSessionRequest,
     PortalSessionResponse,
+    RecordCrawlUsageRequest,
+    RecordCrawlUsageResponse,
     WebhookAckResponse,
 )
 from app.core.config import get_settings
@@ -46,6 +50,7 @@ def billing_config() -> BillingConfigResponse:
         configured=billing_service.billing_configured(settings),
         publishable_key=publishable,
         price_configured=bool((settings.stripe_price_id or "").strip()),
+        metered_configured=stripe_client.metered_billing_configured(settings),
     )
 
 
@@ -98,6 +103,38 @@ def billing_summary(auth: RequireAdmin, session: SessionDep) -> BillingSummaryRe
         customer_id=mine["stripe_customer_id"],
         plan=mine["stripe_price_id"],
     )
+
+
+@router.get(
+    "/crawl-usage",
+    response_model=CrawlUsageStatusResponse,
+    summary="Crawl pages-with-results meter (free tier + totals)",
+)
+def crawl_usage_status(auth: CurrentAuth, session: SessionDep) -> CrawlUsageStatusResponse:
+    data = crawl_usage_service.usage_status_for_user(session, auth.subject)
+    return CrawlUsageStatusResponse(**data)
+
+
+@router.post(
+    "/crawl-usage/record",
+    response_model=RecordCrawlUsageResponse,
+    summary="Record billable crawl pages-with-results for a completed job",
+)
+def record_crawl_usage(
+    body: RecordCrawlUsageRequest,
+    auth: CurrentAuth,
+    session: SessionDep,
+) -> RecordCrawlUsageResponse:
+    try:
+        data = crawl_usage_service.record_job_pages(
+            session,
+            user_id=auth.subject,
+            crawl_job_id=body.crawl_job_id,
+            pages_with_results=body.pages_with_results,
+        )
+    except crawl_usage_service.CrawlUsageError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return RecordCrawlUsageResponse(**data)
 
 
 @router.post(

@@ -13,6 +13,7 @@ class BillingConfigResponse(BaseModel):
     configured: bool
     publishable_key: str = ""
     price_configured: bool = False
+    metered_configured: bool = False
 
 
 class BillingStatusResponse(BaseModel):
@@ -62,3 +63,27 @@ class WebhookAckResponse(BaseModel):
     received: bool = True
     duplicate: bool = False
     event_type: str | None = None
+
+
+class CrawlUsageStatusResponse(BaseModel):
+    price_per_page_cents: int
+    currency: str
+    display_per_page: str
+    free_pages_allowance: int
+    stripe_metered_configured: bool
+    pages_with_results_total: int
+    free_pages_remaining: int
+    billable_pages_total: int
+
+
+class RecordCrawlUsageRequest(BaseModel):
+    crawl_job_id: str = Field(min_length=1, max_length=64)
+    pages_with_results: int = Field(ge=0, le=50_000)
+
+
+class RecordCrawlUsageResponse(CrawlUsageStatusResponse):
+    recorded: bool
+    duplicate: bool
+    pages_with_results: int
+    billable_pages: int
+    stripe_meter_events_sent: int

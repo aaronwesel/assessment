@@ -173,6 +173,28 @@ class Settings(BaseSettings):
         default="http://localhost:5173/billing",
         validation_alias=AliasChoices("STRIPE_PORTAL_RETURN_URL"),
     )
+    stripe_metered_price_id: str = Field(
+        default="",
+        validation_alias=AliasChoices("STRIPE_METERED_PRICE_ID"),
+    )
+    stripe_meter_event_name: str = Field(
+        default="crawl_pages_with_results",
+        validation_alias=AliasChoices("STRIPE_METER_EVENT_NAME"),
+    )
+
+    # Crawl commerce (public via growth API; Stripe test meter after free tier)
+    crawl_free_pages: int = Field(
+        default=5000,
+        validation_alias=AliasChoices("CRAWL_FREE_PAGES"),
+    )
+    crawl_price_per_page_cents: int = Field(
+        default=2,
+        validation_alias=AliasChoices("CRAWL_PRICE_PER_PAGE_CENTS"),
+    )
+    crawl_price_currency: str = Field(
+        default="usd",
+        validation_alias=AliasChoices("CRAWL_PRICE_CURRENCY"),
+    )
 
     # Break-glass emergency access (time-boxed admin overrides)
     break_glass_default_ttl_minutes: int = Field(

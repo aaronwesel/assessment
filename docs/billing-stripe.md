@@ -13,8 +13,19 @@ Checkout Session (subscription) + Customer Portal + signed webhooks. Secrets sta
 | `STRIPE_CHECKOUT_SUCCESS_URL` | API | Default `http://localhost:5173/billing?checkout=success` |
 | `STRIPE_CHECKOUT_CANCEL_URL` | API | Default `http://localhost:5173/billing?checkout=cancel` |
 | `STRIPE_PORTAL_RETURN_URL` | API | Default `http://localhost:5173/billing` |
+| `STRIPE_METERED_PRICE_ID` | API | Test Price on a Billing Meter (per page-with-results) |
+| `STRIPE_METER_EVENT_NAME` | API | Meter event name (default `crawl_pages_with_results`) |
+| `CRAWL_FREE_PAGES` | API | Free tier before meter (default `5000`) |
+| `CRAWL_PRICE_PER_PAGE_CENTS` | API | Published rate for landing copy (default `2` = $0.02) |
 
 Copy from `.env.example` / `backend/.env.example`. Use a [Stripe sandbox](https://docs.stripe.com/sandboxes) for local/CI isolation when possible.
+
+## Crawl meter (pages-with-results)
+
+- **Billable unit:** pages the .NET worker marks **Done** with parsed link results (`crawl.pages.with_results` OTel counter).
+- **Free tier:** first `CRAWL_FREE_PAGES` (default 5000) per authenticated user — tracked in `crawl_job_usage` (idempotent per `crawl_job_id`).
+- **Stripe test:** when `STRIPE_METERED_PRICE_ID` is set and the user has a Stripe Customer, overage pages emit Billing Meter events (`POST /api/v1/billing/crawl-usage/record` from Job Details when signed in).
+- **Public pricing:** `GET /api/v1/growth/crawl-pricing` — landing + wizard copy.
 
 ## API surface
 
@@ -27,6 +38,8 @@ Copy from `.env.example` / `backend/.env.example`. Use a [Stripe sandbox](https:
 | `POST` | `/api/v1/billing/checkout-session` | JWT |
 | `POST` | `/api/v1/billing/portal-session` | JWT |
 | `POST` | `/api/v1/billing/webhooks/stripe` | Stripe-Signature |
+| `GET` | `/api/v1/billing/crawl-usage` | JWT |
+| `POST` | `/api/v1/billing/crawl-usage/record` | JWT |
 
 UI: `/billing` (React under `frontend/src/pages/billing/` and `frontend/src/components/billing/`).
 

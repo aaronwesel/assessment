@@ -142,6 +142,7 @@ public sealed class CrawlPageProcessor(
 
         page.MarkDone(links.Count, internalCount, now);
         CrawlWorkerMetrics.PagesProcessed.Add(1);
+        CrawlWorkerMetrics.PagesWithResults.Add(1);
         await db.SaveChangesAsync(cancellationToken);
 
         var childMessages = new List<CrawlPageRequested>();

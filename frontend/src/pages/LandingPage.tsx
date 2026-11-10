@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { fetchCrawlPricing, type CrawlPricing } from '../api/growth'
 import { TrailmapLogo } from '../components/brand/TrailmapLogo'
+import { config } from '../config'
 
 const HOW_IT_WORKS = [
   {
@@ -31,8 +32,10 @@ export function LandingPage() {
   }, [])
 
   const perPage = pricing?.display_per_page ?? '$0.02'
+  const freePages = pricing?.free_pages_allowance ?? 5000
   const examplePages = 24
   const exampleCost = pricing ? formatExampleCost(pricing, examplePages) : 'about half a dollar'
+  const apiDocs = `${config.apiBaseUrl.replace(/\/$/, '')}/docs`
 
   return (
     <main className="landing landing-trailmap">
@@ -67,10 +70,15 @@ export function LandingPage() {
           </p>
 
           <p className="landing-pricing-callout">
-            <span className="landing-price-chip">{perPage} per page crawled</span>
+            <span className="landing-price-chip">
+              {freePages.toLocaleString()} pages with results free
+            </span>
+            <span className="landing-price-chip landing-price-chip-secondary">
+              then {perPage} per page (Stripe test)
+            </span>
             <span className="hint">
-              Example: a depth‑2 demo on books.toscrape.com (~{examplePages} pages) ≈ {exampleCost} in Stripe test
-              mode.
+              We bill only pages the worker parses successfully (link results). Example: ~{examplePages} pages ≈{' '}
+              {exampleCost} after your free allowance.
             </span>
           </p>
 
@@ -104,7 +112,11 @@ export function LandingPage() {
       </section>
 
       <p className="landing-footnote hint">
-        Quick path for experts: <Link to="/crawl">Start crawl</Link> · AI advises only; link parsing stays in .NET.
+        Quick path for experts: <Link to="/crawl">Start crawl</Link> · Platform API{' '}
+        <a href={apiDocs} target="_blank" rel="noreferrer">
+          interactive docs
+        </a>{' '}
+        · AI advises only; link parsing stays in .NET.
       </p>
     </main>
   )
