@@ -1,18 +1,21 @@
 # assessment
 
-Production-oriented, HIPAA-ready SaaS scaffold (FastAPI · React · Terraform → ECS · Postgres · Redis). Prompt-agnostic stubs only — domain features wait for the live/spec brief.
+Job-based **web crawler** (.NET 8 API + Worker · RabbitMQ · Postgres · React) plus HIPAA-minded SaaS prep (FastAPI auth/billing · Terraform ECS sketch).
+
+**Graded path:** [docs/crawl-readme.md](docs/crawl-readme.md) — run, architecture, message schema, idempotency, retries, DLQ, Domain Link Ratio, PDF rubric priorities/cuts · [docs/crawl.md](docs/crawl.md) (API + engine details).
 
 ## Monorepo layout
 
 | Path | Purpose |
 |------|---------|
-| `backend/` | FastAPI API, workers, Alembic, tests |
-| `frontend/` | Simple React/Vite web UI |
-| `apps/android/` | Android client (same API/auth) |
-| `apps/ios/` | Apple/iOS client (same API/auth) |
-| `infra/terraform/` | AWS IaC (ECS, ALB, Aurora/RDS, Redis, KMS, etc.) — **never apply from CI** |
-| `docs/` | HIPAA checklist, assessment-day runbook, team management / workstreams |
-| `docker-compose.yml` | Local parity: api, db, redis, frontend |
+| `src/` | Graded .NET 8 crawl stack (`Crawl.Api`, `Crawl.Worker`, Domain, Infrastructure) |
+| `tests/` | Crawl unit + HTML fixture integration tests |
+| `frontend/` | React/Vite — crawl console + prep auth UI |
+| `backend/` | FastAPI platform (auth, billing, flags) — side-by-side |
+| `apps/android/` · `apps/ios/` | Mobile clients (platform auth) |
+| `infra/terraform/` | AWS IaC sketch (ECS, Aurora, Amazon MQ crawl modules) — **never apply from CI** |
+| `docs/` | Crawl rubric docs, HIPAA, runbooks |
+| `docker-compose.yml` | db, redis, rabbitmq, crawl-api, crawl-worker, frontend, platform api |
 
 ## Quick start (local)
 
@@ -32,12 +35,15 @@ Production-oriented, HIPAA-ready SaaS scaffold (FastAPI · React · Terraform �
 
    | Service | Default URL / check |
    |---------|---------------------|
-   | API | `GET http://localhost:8000/health` → `200` |
-   | Frontend | `http://localhost:3000` (stub until `frontend/Dockerfile`); use `cd frontend && npm run dev` for real auth UI |
-   | Postgres | `postgres://app:changeme-local-only@localhost:5432/app` (Compose only) |
-   | Redis | `redis://localhost:6379/0` |
+   | Crawl API | `GET http://localhost:8080/health` · Swagger `/swagger` |
+   | Crawl Worker | `GET http://localhost:8081/health` |
+   | Frontend | `http://localhost:3000` (`/crawl`, `/crawl/history`) |
+   | RabbitMQ | `http://localhost:15672` (guest/guest by default) |
+   | Platform API | `GET http://localhost:8000/health` |
+   | Postgres | `app` + `crawl` databases on `localhost:5432` |
+   | Redis | `redis://localhost:6379/0` (platform sessions) |
 
-Compose builds the real FastAPI image from `backend/`. Frontend remains an http-echo stub until `frontend/Dockerfile` lands.
+Optional OTEL collector: `docker compose --profile otel up`. Details: [docs/crawl-readme.md](docs/crawl-readme.md).
 
 Auth smoke (password + Google/Microsoft One Tap): see [docs/auth-smoke.md](docs/auth-smoke.md).
 
@@ -50,26 +56,36 @@ Platform ops smoke (audit, break-glass, consent, flags, signed media, webhooks, 
 
 ## CI
 
-GitHub Actions (`.github/workflows/`):
+GitHub Actions (`.github/workflows/ci.yml`):
 
-- **lint** — backend/frontend lint stubs (no-op until packages exist)
-- **test** — unit/integration stub
-- **docker** — compose config check + image build when Dockerfiles exist
+- **lint** — frontend oxlint (+ backend stub)
+- **test-dotnet** — `dotnet restore/build/test` on `Crawl.sln`
+- **test-frontend** — `npm ci` + production build
+- **test-backend** — pytest (platform)
+- **docker** — compose config + build crawl-api, crawl-worker, frontend, platform api
 - **terraform** — `fmt -check` + `validate` only (**no apply**)
 
 ## Docs
 
+- [Crawl assessment README](docs/crawl-readme.md) — run, architecture, schema, idempotency, retries/DLQ, DLR, assessment PDF priorities (implemented/cut/next), cloud sketch
+- [Crawl API details](docs/crawl.md) — endpoints, queues, domain notes from the .NET stream
+- [Crawl cloud Terraform notes](infra/terraform/CRAWL_CLOUD.md) — ECS + Amazon MQ + Aurora (**no apply**)
 - [HIPAA engineering checklist](docs/hipaa-checklist.md) — required controls before calling anything complete (not a certification claim)
 - [Assessment-day runbook](docs/assessment-day-runbook.md) — parallel streams, health gates, demo order
 - [Load balancing & scaling](docs/load-balancing.md) — ALB fan-out, API vs worker autoscaling
 - [Team management + Slack](docs/team-management.md) — org/team roles, JWT APIs, webhook vs Slack app
 - [Workstreams](docs/workstreams.md) — assign API / UI / infra / mobile / AI to developers
 - [Landing + superadmin](docs/superadmin-landing.md) — public landing, self-serve register, admin console smoke
+- [Guided crawl UX](docs/guided-crawl-ux.md) — wizard, Job Details report/export/diagnosis, per-page pricing hints
 - [Stripe billing (test mode)](docs/billing-stripe.md) — Checkout, Customer Portal, webhook smoke
 - [Contributing](CONTRIBUTING.md) — PR ownership and CODEOWNERS expectations
 
-## Explicit non-goals (prep)
+## Stretch (not graded core)
 
-- No domain product features until the live prompt
-- No `terraform apply` in prep or CI
+AI-assisted **crawl incident monitoring + remediation** (backoff / politeness / optional egress proxy hop / optional email alerts) is documented in [docs/crawl-readme.md](docs/crawl-readme.md#stretch-ai-crawl-incident-monitor-ops--observability). It does **not** replace deterministic crawl parsing, Domain Link Ratio, or the RabbitMQ job pipeline.
+
+## Explicit non-goals
+
+- No `terraform apply` in prep or CI (cloud sketch only)
 - No committed secrets or PHI sample data
+- AI must not own HTML link parsing or Domain Link Ratio

@@ -20,19 +20,23 @@ Until then, only:
 
 Do **not** create real AWS resources from this prep branch.
 
+Crawl cloud sketch (ECS + Amazon MQ, not wired into root `main.tf`): see [`terraform/CRAWL_CLOUD.md`](terraform/CRAWL_CLOUD.md).
+
 ## Layout
 
 ```
 infra/
   README.md                 # this file
+  otel/                     # local OTEL collector config (Compose --profile otel)
   terraform/
     README.md               # usage, HIPAA defaults, apply gate
+    CRAWL_CLOUD.md          # crawl ECS + MQ + Aurora mapping (no apply)
     versions.tf
     providers.tf
     variables.tf
     locals.tf
     outputs.tf
-    main.tf                 # wires modules
+    main.tf                 # wires platform modules (not crawl sketches yet)
     environments/
       dev.tfvars.example
       prod.tfvars.example
@@ -49,6 +53,8 @@ infra/
       cloudwatch/
       waf/
       iam/
+      amazon-mq/    # SKETCH — Crawl RabbitMQ broker
+      crawl-ecs/    # SKETCH — Crawl.Api + Crawl.Worker tasks
 ```
 
 ## Quick validate (no apply)
