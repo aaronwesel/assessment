@@ -41,6 +41,8 @@ Compose builds the real FastAPI image from `backend/`. Frontend remains an http-
 
 Auth smoke (password + Google/Microsoft One Tap): see [docs/auth-smoke.md](docs/auth-smoke.md).
 
+Platform ops smoke (audit, break-glass, consent, flags, signed media, webhooks, health/SLO): see [docs/security-ops.md](docs/security-ops.md).
+
 ## Environment
 
 - Use `.env.example` as the contract. Put secrets in local `.env`, CI secrets, or AWS Secrets Manager — **never** in git.
@@ -62,6 +64,8 @@ GitHub Actions (`.github/workflows/`):
 - [Load balancing & scaling](docs/load-balancing.md) — ALB fan-out, API vs worker autoscaling
 - [Team management + Slack](docs/team-management.md) — org/team roles, JWT APIs, webhook vs Slack app
 - [Workstreams](docs/workstreams.md) — assign API / UI / infra / mobile / AI to developers
+- [Landing + superadmin](docs/superadmin-landing.md) — public landing, self-serve register, admin console smoke
+- [Stripe billing (test mode)](docs/billing-stripe.md) — Checkout, Customer Portal, webhook smoke
 - [Contributing](CONTRIBUTING.md) — PR ownership and CODEOWNERS expectations
 
 ## Explicit non-goals (prep)

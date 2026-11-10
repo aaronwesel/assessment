@@ -19,6 +19,8 @@ def test_health_ready(client: TestClient) -> None:
     assert body["deepseek_enabled"] is False
     assert body["rekognition_enabled"] is False
     assert body["ses_enabled"] is False
+    assert "feature_flags" in body
+    assert body["webhooks_enabled"] is True
 
 
 def test_api_v1_health(client: TestClient) -> None:

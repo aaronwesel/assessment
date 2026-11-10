@@ -44,6 +44,11 @@ For local **HTTP** (not HTTPS), `Info.plist` includes a narrow `NSAppTransportSe
 
 Do not commit OAuth client secrets; use Xcode build settings / CI secrets when apps are registered.
 
+## Push stub (APNs)
+
+`Push/PushConfig.swift` holds APNs team/key/topic placeholders (no `.p8` secrets).  
+`Push/AlertReceivedHandler.swift` is the single “alert received” path — call it from a future `UNUserNotificationCenter` delegate (or debug UI) with an opaque alert id. Payloads must never include PHI.
+
 ## Package layout
 
 ```
@@ -52,6 +57,8 @@ AssessmentApp/
   ContentView.swift        Root host → LoginView
   LoginView.swift          Login placeholders
   Config/ApiConfig.swift   API base URL + auth path stubs
+  Push/PushConfig.swift    APNs config placeholders
+  Push/AlertReceivedHandler.swift  Alert-received stub path
   Info.plist               ATS localhost exceptions (scaffold)
 project.yml                XcodeGen spec
 ```

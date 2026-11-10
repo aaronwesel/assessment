@@ -143,6 +143,79 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("SLACK_ENABLED"),
     )
 
+    # Stripe Billing (test mode) — secrets via env / Secrets Manager only
+    stripe_secret_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("STRIPE_SECRET_KEY"),
+    )
+    stripe_publishable_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("STRIPE_PUBLISHABLE_KEY"),
+    )
+    stripe_webhook_secret: str = Field(
+        default="",
+        validation_alias=AliasChoices("STRIPE_WEBHOOK_SECRET"),
+    )
+    stripe_price_id: str = Field(
+        default="",
+        validation_alias=AliasChoices("STRIPE_PRICE_ID"),
+    )
+    # Checkout / Portal return URLs (local defaults point at Vite frontend)
+    stripe_checkout_success_url: str = Field(
+        default="http://localhost:5173/billing?checkout=success",
+        validation_alias=AliasChoices("STRIPE_CHECKOUT_SUCCESS_URL"),
+    )
+    stripe_checkout_cancel_url: str = Field(
+        default="http://localhost:5173/billing?checkout=cancel",
+        validation_alias=AliasChoices("STRIPE_CHECKOUT_CANCEL_URL"),
+    )
+    stripe_portal_return_url: str = Field(
+        default="http://localhost:5173/billing",
+        validation_alias=AliasChoices("STRIPE_PORTAL_RETURN_URL"),
+    )
+
+    # Break-glass emergency access (time-boxed admin overrides)
+    break_glass_default_ttl_minutes: int = Field(
+        default=60,
+        validation_alias="BREAK_GLASS_DEFAULT_TTL_MINUTES",
+    )
+    break_glass_max_ttl_minutes: int = Field(
+        default=24 * 60,
+        validation_alias="BREAK_GLASS_MAX_TTL_MINUTES",
+    )
+
+    # Signed media URLs (S3-minded stub). Prefer a dedicated signing secret in prod.
+    media_signing_secret: str = Field(
+        default="",
+        validation_alias=AliasChoices("MEDIA_SIGNING_SECRET"),
+    )
+    media_public_base_url: str = Field(
+        default="https://media.example.local/objects",
+        validation_alias="MEDIA_PUBLIC_BASE_URL",
+    )
+    media_signed_url_ttl_seconds: int = Field(
+        default=300,
+        validation_alias="MEDIA_SIGNED_URL_TTL_SECONDS",
+    )
+    media_signed_url_max_ttl_seconds: int = Field(
+        default=3600,
+        validation_alias="MEDIA_SIGNED_URL_MAX_TTL_SECONDS",
+    )
+
+    # Outbound webhook outbox (HMAC-signed deliveries)
+    webhooks_enabled: bool = Field(
+        default=True,
+        validation_alias="WEBHOOKS_ENABLED",
+    )
+    webhook_signing_secret: str = Field(
+        default="",
+        validation_alias=AliasChoices("WEBHOOK_SIGNING_SECRET"),
+    )
+    webhook_max_attempts: int = Field(
+        default=8,
+        validation_alias="WEBHOOK_MAX_ATTEMPTS",
+    )
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
