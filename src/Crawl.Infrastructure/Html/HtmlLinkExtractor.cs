@@ -31,7 +31,7 @@ public sealed class HtmlLinkExtractor
         var results = new List<Uri>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
 
-        foreach (var anchor in document.QuerySelectorAll("a[href]"))
+        foreach (var anchor in document.QuerySelectorAll("a[href], area[href]"))
         {
             var href = anchor.GetAttribute("href");
             if (!UrlNormalizer.TryNormalize(href, baseUri, options, out var normalized))

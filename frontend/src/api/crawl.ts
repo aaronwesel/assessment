@@ -32,6 +32,8 @@ export interface CrawlJob {
   failureReason: string | null
   pageCounts: PageCounts
   progressPercent: number
+  /** Server-side sparse crawl / SPA hints (deterministic). */
+  diagnostics?: string[]
 }
 
 export interface PageNode {
