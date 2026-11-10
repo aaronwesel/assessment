@@ -1,4 +1,5 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
+import { TotpQrCode } from './TotpQrCode'
 import {
   confirmMfa,
   disableMfa,
@@ -9,12 +10,11 @@ import {
 import { useAuth } from '../auth/AuthContext'
 
 /**
- * Simple MFA enroll / verify UI stub.
- * Does not render QR images — shows otpauth URI + secret for authenticator apps.
+ * MFA enroll / verify with scannable TOTP QR during enrollment.
  * Never console.log secrets or backup codes in production builds.
  */
 export function MfaPanel() {
-  const { tokens } = useAuth()
+  const { tokens, user, loginWithTokens } = useAuth()
   const access = tokens?.access_token
   const [enabled, setEnabled] = useState<boolean | null>(null)
   const [secret, setSecret] = useState('')
@@ -27,9 +27,20 @@ export function MfaPanel() {
 
   if (!access) return null
 
+  useEffect(() => {
+    if (!access) return
+    void fetchMfaStatus(access).then((status) => setEnabled(status.mfa_enabled))
+  }, [access])
+
   async function refreshStatus() {
     const status = await fetchMfaStatus(access!)
     setEnabled(status.mfa_enabled)
+  }
+
+  async function refreshSessionProfile() {
+    if (!tokens) return
+    const provider = user?.provider ?? 'password'
+    await loginWithTokens(tokens, provider)
   }
 
   async function onEnroll() {
@@ -62,6 +73,7 @@ export function MfaPanel() {
       setTotpCode('')
       setMessage('MFA enabled. Store backup codes offline — shown once.')
       await refreshStatus()
+      await refreshSessionProfile()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Confirm failed')
     } finally {
@@ -107,8 +119,9 @@ export function MfaPanel() {
     <section className="mfa-panel" aria-labelledby="mfa-heading">
       <h2 id="mfa-heading">Multi-factor auth</h2>
       <p className="hint">
-        TOTP stub for HIPAA-ready prep. Status:{' '}
+        Authenticator app (TOTP). Status:{' '}
         {enabled === null ? 'unknown' : enabled ? 'enabled' : 'disabled'}.
+        {user?.mfaPolicyRequired && !enabled ? ' — required for your account type.' : null}
       </p>
       <div className="auth-mode-toggle" role="group" aria-label="MFA actions">
         <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => void refreshStatus()}>
@@ -121,9 +134,14 @@ export function MfaPanel() {
 
       {otpauthUri ? (
         <div className="mfa-secret-block">
-          <p className="hint">Authenticator URI (keep private):</p>
-          <code className="mfa-code">{otpauthUri}</code>
-          <p className="hint">Secret: {secret}</p>
+          <p className="hint">Scan this QR code with your authenticator app:</p>
+          <TotpQrCode otpauthUri={otpauthUri} />
+          <details className="mfa-manual-entry">
+            <summary>Enter secret manually</summary>
+            <p className="hint">Keep this private — do not share screenshots.</p>
+            <code className="mfa-code">{secret}</code>
+            <code className="mfa-code">{otpauthUri}</code>
+          </details>
         </div>
       ) : null}
 
