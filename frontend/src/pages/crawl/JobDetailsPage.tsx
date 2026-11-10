@@ -1,7 +1,7 @@
 /**
- * Job Details — live progress, readable tree + DLR, assistive AI when available.
+ * Job Details — live progress, actionable report, tree + DLR, export, element pick, AI assist.
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
   crawlApi,
@@ -17,7 +17,9 @@ import {
   CrawlError,
   CrawlLoading,
 } from '../../components/crawl/CrawlStates'
+import { ElementPickExport } from '../../components/crawl/ElementPickExport'
 import { JobProgress } from '../../components/crawl/JobProgress'
+import { JobResultsHub } from '../../components/crawl/JobResultsHub'
 import { PageTree } from '../../components/crawl/PageTree'
 import { StatusBadge } from '../../components/crawl/StatusBadge'
 import { AiAssistPanels, IncidentsPanel } from '../../crawl/ai/AiAssistPanels'
@@ -29,6 +31,9 @@ const POLL_MS = 1500
 export function JobDetailsPage() {
   const { jobId = '' } = useParams()
   const [job, setJob] = useState<CrawlJob | null>(null)
+  const [tree, setTree] = useState<JobTree | null>(null)
+  const [treeError, setTreeError] = useState<string | null>(null)
+  const [treeLoading, setTreeLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const liveStatus = job?.status
@@ -57,33 +62,65 @@ export function JobDetailsPage() {
     [jobId],
   )
 
+  const loadTree = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      if (!jobId) return
+      if (!opts?.silent) {
+        setTreeLoading(true)
+        setTreeError(null)
+      }
+      try {
+        const next = await crawlApi.getJobTree(jobId)
+        setTree(next)
+        setTreeError(null)
+      } catch (err) {
+        setTree(null)
+        setTreeError(
+          err instanceof CrawlApiError ? err.message : 'Failed to load page tree.',
+        )
+      } finally {
+        if (!opts?.silent) setTreeLoading(false)
+      }
+    },
+    [jobId],
+  )
+
   useEffect(() => {
     void loadJob()
-  }, [loadJob])
+    void loadTree()
+  }, [loadJob, loadTree])
 
   useEffect(() => {
     if (!liveStatus || !isActiveJobStatus(liveStatus)) return
     const timer = window.setInterval(() => {
       void loadJob({ silent: true })
+      void loadTree({ silent: true })
     }, POLL_MS)
     return () => window.clearInterval(timer)
-  }, [liveStatus, loadJob])
+  }, [liveStatus, loadJob, loadTree])
 
   const live = !!job && isActiveJobStatus(job.status)
+  const terminal = !!job && !isActiveJobStatus(job.status)
+  const root = tree?.root ?? null
+
+  const pages = useMemo(() => flattenPages(root), [root])
 
   return (
     <CrawlShell
       title="Job details"
       lede={
         live
-          ? 'Live crawl in progress — progress refreshes automatically.'
-          : 'Status, timestamps, page tree, and Domain Link Ratio for this job.'
+          ? 'Live crawl — report and tree update as pages finish.'
+          : 'Crawl report, exports, Domain Link Ratio tree, and AI assist.'
       }
       wide
       actions={
         <div className="crawl-console-actions-row">
           <Link className="btn btn-ghost" to="/crawl/history">
             History
+          </Link>
+          <Link className="btn btn-ghost" to="/crawl/welcome">
+            Wizard
           </Link>
           <Link className="btn btn-primary" to="/crawl">
             New crawl
@@ -100,22 +137,36 @@ export function JobDetailsPage() {
       {job ? (
         <div className="crawl-details-layout crawl-rise-delay">
           <JobSummary job={job} live={live} onCanceled={() => void loadJob()} />
+
+          <JobResultsHub job={job} root={root} terminal={terminal} />
+
           <section className="crawl-panel-block crawl-ai-wrap" aria-label="Crawl incidents">
             <IncidentsPanel jobId={job.jobId} />
           </section>
-          {job.status === 'Completed' || job.status === 'Failed' || job.status === 'Canceled' ? (
-            <JobTreeSection jobId={job.jobId} job={job} />
-          ) : (
-            <section className="crawl-panel-block" aria-labelledby="tree-waiting">
-              <h2 id="tree-waiting" className="crawl-section-title">
-                Page tree
-              </h2>
-              <CrawlEmpty title="Tree unlocks when the job finishes">
-                Keep this tab open — progress updates every {POLL_MS / 1000}s. Domain
-                Link Ratio appears on each page once parsing completes.
-              </CrawlEmpty>
+
+          <JobTreeSection
+            jobId={job.jobId}
+            live={live}
+            root={root}
+            loading={treeLoading}
+            error={treeError}
+            onRetry={() => void loadTree()}
+          />
+
+          {root ? <ElementPickExport jobId={job.jobId} root={root} /> : null}
+
+          {pages.length > 0 ? (
+            <section className="crawl-panel-block crawl-ai-wrap" aria-label="Assistive AI">
+              <AiAssistPanels
+                jobId={job.jobId}
+                seedUrl={job.url}
+                status={job.status}
+                pages={pages}
+                pageCount={job.pageCounts.total}
+                edgeCount={pages.length}
+              />
             </section>
-          )}
+          ) : null}
         </div>
       ) : null}
     </CrawlShell>
@@ -208,8 +259,8 @@ function JobSummary({
             {cancelPending ? 'Canceling…' : 'Cancel job'}
           </button>
         ) : (
-          <Link className="btn btn-primary" to="/crawl">
-            Run another crawl
+          <Link className="btn btn-primary" to="/crawl/welcome">
+            Run guided retry
           </Link>
         )}
         {live ? (
@@ -229,6 +280,49 @@ function JobSummary({
   )
 }
 
+function JobTreeSection({
+  jobId,
+  live,
+  root,
+  loading,
+  error,
+  onRetry,
+}: {
+  jobId: string
+  live: boolean
+  root: PageNode | null
+  loading: boolean
+  error: string | null
+  onRetry: () => void
+}) {
+  return (
+    <section className="crawl-panel-block" aria-labelledby="tree-heading">
+      <div className="crawl-summary-head">
+        <h2 id="tree-heading" className="crawl-section-title">
+          Page tree
+        </h2>
+        <span className="hint">
+          {live ? 'Grows as pages complete' : 'Domain Link Ratio per page'}
+        </span>
+      </div>
+
+      {loading && !root ? <CrawlLoading label="Loading page tree…" /> : null}
+
+      {error ? <CrawlError message={error} onRetry={onRetry} /> : null}
+
+      {!loading && !error && root ? <PageTree jobId={jobId} root={root} /> : null}
+
+      {!loading && !error && !root ? (
+        <CrawlEmpty title="No pages in tree yet" actionTo="/crawl/welcome" actionLabel="Try wizard">
+          {live
+            ? 'The worker is still fetching the seed page — keep this tab open.'
+            : 'The job finished without a crawlable root page. Use the crawl report above for diagnosis.'}
+        </CrawlEmpty>
+      ) : null}
+    </section>
+  )
+}
+
 function flattenPages(node: PageNode | null, acc: CrawlPageSnapshot[] = []): CrawlPageSnapshot[] {
   if (!node) return acc
   acc.push({
@@ -243,77 +337,4 @@ function flattenPages(node: PageNode | null, acc: CrawlPageSnapshot[] = []): Cra
     flattenPages(child, acc)
   }
   return acc
-}
-
-function JobTreeSection({ jobId, job }: { jobId: string; job: CrawlJob }) {
-  const [tree, setTree] = useState<JobTree | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  const load = useCallback(async () => {
-    await Promise.resolve()
-    setLoading(true)
-    setError(null)
-    try {
-      setTree(await crawlApi.getJobTree(jobId))
-    } catch (err) {
-      setTree(null)
-      setError(
-        err instanceof CrawlApiError ? err.message : 'Failed to load page tree.',
-      )
-    } finally {
-      setLoading(false)
-    }
-  }, [jobId])
-
-  useEffect(() => {
-    void load()
-  }, [load])
-
-  const pages = flattenPages(tree?.root ?? null)
-
-  return (
-    <>
-      <section className="crawl-panel-block" aria-labelledby="tree-heading">
-        <div className="crawl-summary-head">
-          <h2 id="tree-heading" className="crawl-section-title">
-            Page tree
-          </h2>
-          <span className="hint">Domain Link Ratio per page</span>
-        </div>
-
-        {loading ? <CrawlLoading label="Loading page tree…" /> : null}
-
-        {error ? (
-          <CrawlError message={error} onRetry={() => void load()} />
-        ) : null}
-
-        {!loading && !error && tree?.root ? (
-          <PageTree jobId={jobId} root={tree.root} />
-        ) : null}
-
-        {!loading && !error && tree && !tree.root ? (
-          <CrawlEmpty title="No pages crawled" actionTo="/crawl" actionLabel="Start another crawl">
-            The job finished without a crawlable root page.
-          </CrawlEmpty>
-        ) : null}
-      </section>
-
-      {!loading && !error ? (
-        <section className="crawl-panel-block crawl-ai-wrap" aria-label="Assistive AI">
-          <AiAssistPanels
-            jobId={jobId}
-            seedUrl={job.url}
-            status={job.status}
-            pages={pages}
-            pageCount={job.pageCounts.total}
-            edgeCount={pages.reduce(
-              (n, p) => n + (p.domainLinkRatio != null ? 1 : 0),
-              0,
-            )}
-          />
-        </section>
-      ) : null}
-    </>
-  )
 }

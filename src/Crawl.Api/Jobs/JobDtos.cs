@@ -53,6 +53,18 @@ public sealed record JobTreeDto(Guid JobId, string Status, PageTreeNodeDto? Root
 
 public sealed record PageLinkDto(string Url, bool IsInternal);
 
+/// <summary>Flat page list for exports and live job details (tree may still be partial).</summary>
+public sealed record PageRowDto(
+    long PageId,
+    string Url,
+    int Depth,
+    string Status,
+    decimal? DomainLinkRatio,
+    int? LinkCount,
+    int? InternalLinkCount,
+    string? Error,
+    long? ParentPageId);
+
 public static class JobDtoMapper
 {
     public static JobSummaryDto ToSummary(CrawlJob job, IReadOnlyList<CrawlPage> pages)
@@ -84,6 +96,22 @@ public static class JobDtoMapper
 
     public static JobTreeDto ToTree(CrawlJob job, IReadOnlyList<CrawlPage> pages) =>
         new(job.Id, job.Status.ToString(), BuildRoot(pages));
+
+    public static IReadOnlyList<PageRowDto> ToFlatPages(IReadOnlyList<CrawlPage> pages) =>
+        pages
+            .OrderBy(p => p.Depth)
+            .ThenBy(p => p.Url)
+            .Select(p => new PageRowDto(
+                p.Id,
+                p.Url,
+                p.Depth,
+                p.Status.ToString(),
+                p.DomainLinkRatioValue,
+                p.LinkCount,
+                p.InternalLinkCount,
+                p.Error,
+                p.ParentPageId))
+            .ToList();
 
     private static PageTreeNodeDto? BuildRoot(IReadOnlyList<CrawlPage> pages)
     {

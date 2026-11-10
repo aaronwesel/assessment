@@ -75,6 +75,19 @@ public sealed class JobService(
         return JobDtoMapper.ToTree(job, pages);
     }
 
+    public async Task<IReadOnlyList<PageRowDto>?> GetPagesAsync(Guid jobId, CancellationToken cancellationToken)
+    {
+        var exists = await db.Jobs.AsNoTracking().AnyAsync(j => j.Id == jobId, cancellationToken);
+        if (!exists)
+            return null;
+
+        var pages = await db.Pages.AsNoTracking()
+            .Where(p => p.JobId == jobId)
+            .ToListAsync(cancellationToken);
+
+        return JobDtoMapper.ToFlatPages(pages);
+    }
+
     public async Task<IReadOnlyList<PageLinkDto>?> GetPageLinksAsync(
         Guid jobId,
         long pageId,

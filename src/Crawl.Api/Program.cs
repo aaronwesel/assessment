@@ -124,6 +124,14 @@ try
         .WithName("GetJobTree")
         .WithOpenApi();
 
+    jobs.MapGet("/{jobId:guid}/pages", async (Guid jobId, JobService service, CancellationToken ct) =>
+        {
+            var pages = await service.GetPagesAsync(jobId, ct);
+            return pages is null ? Results.NotFound() : Results.Ok(pages);
+        })
+        .WithName("ListJobPages")
+        .WithOpenApi();
+
     jobs.MapGet("/{jobId:guid}/pages/{pageId:long}/links", async (Guid jobId, long pageId, JobService service, CancellationToken ct) =>
         {
             var links = await service.GetPageLinksAsync(jobId, pageId, ct);
