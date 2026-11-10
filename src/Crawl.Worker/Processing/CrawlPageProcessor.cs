@@ -1,5 +1,6 @@
 using Crawl.Ai.Incidents;
 using Crawl.Domain.Fetching;
+using Crawl.Domain.Html;
 using Crawl.Domain.Incidents;
 using Crawl.Domain.Jobs;
 using Crawl.Domain.Links;
@@ -21,6 +22,7 @@ public sealed class CrawlPageProcessor(
     CrawlDbContext db,
     HtmlPageFetcher fetcher,
     HtmlLinkExtractor linkExtractor,
+    CrawlSeedLinkExpander seedExpander,
     ICrawlMessagePublisher publisher,
     ICrawlIncidentMonitor incidentMonitor,
     IOptions<CrawlHttpOptions> httpOptions,
@@ -135,12 +137,47 @@ public sealed class CrawlPageProcessor(
             edges.Add(PageEdge.Create(page.Id, link, isInternal));
         }
 
+        if (page.Depth == 0
+            && internalCount < 3
+            && job.CanEnqueueChildrenOf(page.Depth))
+        {
+            var expanded = await seedExpander.ExpandAsync(
+                fetch.Html,
+                parseBase,
+                startHost,
+                normalizeOptions,
+                cancellationToken);
+
+            foreach (var extra in expanded)
+            {
+                if (childCandidates.Any(c => c.AbsoluteUri == extra.AbsoluteUri))
+                    continue;
+
+                childCandidates.Add(extra);
+                internalCount++;
+                edges.Add(PageEdge.Create(page.Id, extra, isInternal: true));
+            }
+        }
+
+        if (page.Depth == 0
+            && SparseHtmlSignals.IsSuspiciouslySparse(fetch.Html, links.Count)
+            && internalCount == 0)
+        {
+            page.MarkSkipped(
+                "Seed HTML looks like a bot block or JS shell (almost no server-rendered links). " +
+                "Try a deeper folder URL, login assist, or a site that serves static HTML.",
+                now);
+            CrawlWorkerMetrics.PagesSkipped.Add(1);
+            await FinalizeAsync(job, cancellationToken);
+            return;
+        }
+
         // Replace edges idempotently: delete existing then insert (unique index guards races).
         var existingEdges = await db.Edges.Where(e => e.SourcePageId == page.Id).ToListAsync(cancellationToken);
         db.Edges.RemoveRange(existingEdges);
         db.Edges.AddRange(edges);
 
-        page.MarkDone(links.Count, internalCount, now);
+        page.MarkDone(edges.Count, internalCount, now);
         CrawlWorkerMetrics.PagesProcessed.Add(1);
         await db.SaveChangesAsync(cancellationToken);
 

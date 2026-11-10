@@ -27,7 +27,8 @@ public sealed record JobSummaryDto(
     string? FailureReason,
     PageCountsDto PageCounts,
     /// <summary>0–100 progress from terminal pages / max(total, maxPages budget signal).</summary>
-    int ProgressPercent);
+    int ProgressPercent,
+    IReadOnlyList<string> Diagnosis);
 
 public sealed record JobHistoryItemDto(
     Guid JobId,
@@ -91,7 +92,8 @@ public static class JobDtoMapper
             job.CompletedAt,
             job.FailureReason,
             new PageCountsDto(pages.Count, queued, processing, done, skipped, failed),
-            progress);
+            progress,
+            CrawlJobDiagnostics.Build(job, pages));
     }
 
     public static JobTreeDto ToTree(CrawlJob job, IReadOnlyList<CrawlPage> pages) =>

@@ -79,7 +79,12 @@ export function buildJobReport(job: CrawlJob, root: PageNode | null): CrawlJobRe
   let outcome: CrawlJobReport['outcome'] = 'success'
   if (job.status === 'Failed') outcome = 'failed'
   else if (pagesDone === 0) outcome = 'empty'
-  else if (pagesFailed > 0 || job.pageCounts.skipped > 0) outcome = 'partial'
+  else if (
+    pagesFailed > 0 ||
+    job.pageCounts.skipped > 0 ||
+    (job.maxDepth >= 1 && pagesDone <= 3 && rows.length <= 3)
+  )
+    outcome = 'partial'
 
   if (pagesDone === 0) {
     hints.push('No HTML pages finished parsing — check the start URL, depth, or login wall.')
@@ -112,7 +117,7 @@ export function buildJobReport(job: CrawlJob, root: PageNode | null): CrawlJobRe
 }
 
 export function diagnoseEmptyOrWeak(job: CrawlJob, report: CrawlJobReport): string[] {
-  const tips: string[] = [...report.hints]
+  const tips: string[] = [...report.hints, ...(job.diagnosis ?? [])]
   try {
     const parsed = new URL(job.url)
     if (!job.url.startsWith('http')) {
@@ -129,6 +134,16 @@ export function diagnoseEmptyOrWeak(job: CrawlJob, report: CrawlJobReport): stri
   }
   if (report.pagesDone === 0 && job.pageCounts.processing === 0 && job.pageCounts.queued === 0) {
     tips.push('Worker queue drained with zero successes — likely blocked HTML, redirect loop, or non-HTML response.')
+  }
+  if (
+    job.pageCounts.total <= 3 &&
+    job.maxDepth >= 1 &&
+    report.pagesDone > 0 &&
+  job.status === 'Completed'
+  ) {
+    tips.push(
+      'Very few pages often means JavaScript-rendered HTML, robots.txt restrictions, or an anti-bot shell — this worker does not execute JavaScript.',
+    )
   }
   return [...new Set(tips)]
 }

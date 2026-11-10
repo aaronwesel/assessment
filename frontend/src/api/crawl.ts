@@ -32,6 +32,8 @@ export interface CrawlJob {
   failureReason: string | null
   pageCounts: PageCounts
   progressPercent: number
+  /** Worker/API deterministic diagnosis for sparse or blocked crawls. */
+  diagnosis?: string[]
 }
 
 export interface PageNode {
