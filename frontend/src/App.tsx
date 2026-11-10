@@ -1,15 +1,25 @@
 /**
  * Top-level router shell.
  *
- * AuthProvider holds JWT tokens in sessionStorage; RequireAuth gates `/`.
- * Login is public; unknown paths redirect home (which then bounces to login).
+ * Public: landing `/`, login, register.
+ * Authenticated: `/app` home.
+ * Admin/superadmin: `/superadmin/*` console.
  */
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
 import { Nav } from './components/Nav'
 import { RequireAuth } from './components/RequireAuth'
+import { RequireRole } from './components/RequireRole'
 import { HomePage } from './pages/HomePage'
+import { LandingPage } from './pages/LandingPage'
 import { LoginPage } from './pages/LoginPage'
+import { RegisterPage } from './pages/RegisterPage'
+import { SuperadminAuditPage } from './pages/superadmin/AuditPage'
+import { SuperadminBillingPage } from './pages/superadmin/BillingPage'
+import { SuperadminFlagsPage } from './pages/superadmin/FlagsPage'
+import { SuperadminHealthPage } from './pages/superadmin/HealthPage'
+import { SuperadminOverviewPage } from './pages/superadmin/OverviewPage'
+import { SuperadminLayout } from './pages/superadmin/SuperadminLayout'
 
 export default function App() {
   return (
@@ -18,15 +28,31 @@ export default function App() {
         <div className="app-shell">
           <Nav />
           <Routes>
+            <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
             <Route
-              path="/"
+              path="/app"
               element={
                 <RequireAuth>
                   <HomePage />
                 </RequireAuth>
               }
             />
+            <Route
+              path="/superadmin"
+              element={
+                <RequireRole>
+                  <SuperadminLayout />
+                </RequireRole>
+              }
+            >
+              <Route index element={<SuperadminOverviewPage />} />
+              <Route path="health" element={<SuperadminHealthPage />} />
+              <Route path="flags" element={<SuperadminFlagsPage />} />
+              <Route path="audit" element={<SuperadminAuditPage />} />
+              <Route path="billing" element={<SuperadminBillingPage />} />
+            </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>
