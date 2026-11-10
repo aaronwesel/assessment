@@ -8,6 +8,8 @@ const links = [
   { to: '/superadmin/health', end: false, label: 'Health / SLO' },
   { to: '/superadmin/flags', end: false, label: 'Flags' },
   { to: '/superadmin/audit', end: false, label: 'Audit skim' },
+  { to: '/superadmin/break-glass', end: false, label: 'Break-glass' },
+  { to: '/superadmin/webhooks', end: false, label: 'Webhooks' },
   { to: '/superadmin/billing', end: false, label: 'Billing skim' },
 ]
 

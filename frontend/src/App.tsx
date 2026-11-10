@@ -17,10 +17,12 @@ import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
 import { SuperadminAuditPage } from './pages/superadmin/AuditPage'
 import { SuperadminBillingPage } from './pages/superadmin/BillingPage'
+import { SuperadminBreakGlassPage } from './pages/superadmin/BreakGlassPage'
 import { SuperadminFlagsPage } from './pages/superadmin/FlagsPage'
 import { SuperadminHealthPage } from './pages/superadmin/HealthPage'
 import { SuperadminOverviewPage } from './pages/superadmin/OverviewPage'
 import { SuperadminLayout } from './pages/superadmin/SuperadminLayout'
+import { SuperadminWebhooksPage } from './pages/superadmin/WebhooksPage'
 
 export default function App() {
   return (
@@ -60,6 +62,8 @@ export default function App() {
               <Route path="health" element={<SuperadminHealthPage />} />
               <Route path="flags" element={<SuperadminFlagsPage />} />
               <Route path="audit" element={<SuperadminAuditPage />} />
+              <Route path="break-glass" element={<SuperadminBreakGlassPage />} />
+              <Route path="webhooks" element={<SuperadminWebhooksPage />} />
               <Route path="billing" element={<SuperadminBillingPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />

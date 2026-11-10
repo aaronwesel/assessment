@@ -5,6 +5,7 @@ import {
   type FetchResult,
 } from '../../api/platform'
 import { useAuth } from '../../auth/AuthContext'
+import { Link } from 'react-router-dom'
 
 export function SuperadminBillingPage() {
   const { tokens } = useAuth()
@@ -27,15 +28,16 @@ export function SuperadminBillingPage() {
     <main className="sa-page">
       <h1>Billing skim</h1>
       <p className="lede">
-        Read-only subscription summary. Checkout / portal live under billing
-        settings (workstream B) — this page does not mutate Stripe.
+        Admin summary from <code>/api/v1/billing/summary</code>. Checkout / portal
+        live under <Link to="/billing">Billing settings</Link> — this page does not
+        mutate Stripe.
       </p>
 
       {result === null ? <p className="hint">Loading…</p> : null}
       {result && !result.available ? (
         <p className="hint">
-          Billing summary unavailable ({result.detail}). Placeholder until{' '}
-          <code>/api/v1/billing/summary</code> lands.
+          Billing summary unavailable ({result.detail}). Expect{' '}
+          <code>/api/v1/billing/summary</code>.
         </p>
       ) : null}
       {result?.available ? (

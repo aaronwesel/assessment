@@ -1,23 +1,37 @@
 import { useEffect, useState } from 'react'
 import {
   fetchHealthLive,
+  fetchHealthMetrics,
   fetchHealthReady,
+  fetchHealthSlo,
   type FetchResult,
   type HealthLive,
   type HealthReady,
+  type HealthSlo,
 } from '../../api/platform'
 
 export function SuperadminHealthPage() {
   const [live, setLive] = useState<FetchResult<HealthLive> | null>(null)
   const [ready, setReady] = useState<FetchResult<HealthReady> | null>(null)
+  const [slo, setSlo] = useState<FetchResult<HealthSlo> | null>(null)
+  const [metrics, setMetrics] = useState<FetchResult<Record<string, unknown>> | null>(
+    null,
+  )
 
   useEffect(() => {
     let cancelled = false
     void (async () => {
-      const [l, r] = await Promise.all([fetchHealthLive(), fetchHealthReady()])
+      const [l, r, s, m] = await Promise.all([
+        fetchHealthLive(),
+        fetchHealthReady(),
+        fetchHealthSlo(),
+        fetchHealthMetrics(),
+      ])
       if (!cancelled) {
         setLive(l)
         setReady(r)
+        setSlo(s)
+        setMetrics(m)
       }
     })()
     return () => {
@@ -29,8 +43,8 @@ export function SuperadminHealthPage() {
     <main className="sa-page">
       <h1>Health / SLO</h1>
       <p className="lede">
-        Liveness and readiness probes. SLO targets are placeholders until metrics
-        land.
+        Liveness, readiness, and in-process SLO metrics from Platform A (
+        <code>/health</code>, <code>/ready</code>, <code>/health/slo</code>).
       </p>
 
       <section className="sa-section">
@@ -56,12 +70,25 @@ export function SuperadminHealthPage() {
       </section>
 
       <section className="sa-section">
-        <h2>SLO targets (placeholder)</h2>
-        <ul className="sa-list">
-          <li>API availability ≥ 99.9% monthly</li>
-          <li>p95 latency &lt; 300ms for auth/me</li>
-          <li>Error budget: 43m / 30d</li>
-        </ul>
+        <h2>SLO <code>/health/slo</code></h2>
+        {slo === null ? (
+          <p className="hint">Checking…</p>
+        ) : slo.available ? (
+          <pre className="sa-pre">{JSON.stringify(slo.data, null, 2)}</pre>
+        ) : (
+          <p className="hint">{slo.detail}</p>
+        )}
+      </section>
+
+      <section className="sa-section">
+        <h2>Metrics <code>/health/metrics</code></h2>
+        {metrics === null ? (
+          <p className="hint">Checking…</p>
+        ) : metrics.available ? (
+          <pre className="sa-pre">{JSON.stringify(metrics.data, null, 2)}</pre>
+        ) : (
+          <p className="hint">{metrics.detail}</p>
+        )}
       </section>
     </main>
   )

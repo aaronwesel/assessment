@@ -28,21 +28,30 @@ Login page links to register; register links back to login.
 
 ## Superadmin console
 
-- Base route: `/superadmin` (nested: `health`, `flags`, `audit`, `billing`)
+- Base route: `/superadmin` (nested: `health`, `flags`, `audit`, `break-glass`, `webhooks`, `billing`)
 - Gate: `RequireRole` allows `admin` or `superadmin` JWT roles. Others redirect to `/app`; anonymous → `/login`.
 - Nav shows **Superadmin** only when the hydrated user has those roles.
-- Dashboards call thin clients in `frontend/src/api/platform.ts`:
-  - Health: `/health`, `/health/ready` (already on API)
-  - Flags: `/api/v1/flags` (fallback `/api/v1/feature-flags`)
-  - Audit skim: `/api/v1/audit?limit=10` (fallback `/api/v1/audits/recent`)
-  - Billing skim: `/api/v1/billing/summary` (fallback `/api/v1/billing/me`)
-- Missing sibling APIs (404/501/network) render **placeholder** tiles — no hard failure.
+- Thin clients in `frontend/src/api/platform.ts` (wired to Platform A/B):
 
-Smoke (role gate):
+| Widget | API |
+|--------|-----|
+| Health / SLO | `/health`, `/health/ready` (alias `/ready`), `/health/slo`, `/health/metrics` |
+| Flags | `GET/PUT/DELETE /api/v1/flags` (toggle + reset override) |
+| Audit skim | `GET /api/v1/audit/events`, export `GET /api/v1/audit/export?format=csv\|json` |
+| Break-glass | `GET /api/v1/break-glass/grants?active_only=true` (skim) |
+| Webhooks | `GET /api/v1/webhooks/outbox` (host-only rows) |
+| Billing skim | `GET /api/v1/billing/summary` (fallback `/billing/me`) |
+
+Missing endpoints (404/501/network) still render **placeholder** tiles — no hard failure.
+
+Smoke (role gate + live APIs):
 
 1. Sign in as a normal `user` → `/superadmin` redirects to `/app`; no Superadmin nav link.
-2. Sign in (or promote) an `admin` user → open `/superadmin` → overview tiles load; Health should be **live** against a running API.
-3. Flags / audit / billing stay placeholders until workstreams A/B expose those routes.
+2. Sign in as `admin` → open `/superadmin` → overview tiles should show **live** for health when the API is up; flags/audit/break-glass/webhooks/billing once those routers are reachable with an admin JWT.
+3. Flags: Force on/off then Reset (clears Redis override).
+4. Audit: Export CSV/JSON downloads (opaque ids only).
+
+Pair with [security-ops.md](security-ops.md) for curl-level Platform A smoke.
 
 ## Mobile push stubs
 
@@ -61,4 +70,5 @@ No real FCM/APNs credentials in git. Payloads must use opaque alert IDs only (no
 | `/login` | public | Sign in |
 | `/register` | public | Self-serve signup |
 | `/app` | JWT | Authenticated home / MFA |
+| `/billing` | JWT | Stripe Checkout / Portal settings (workstream B) |
 | `/superadmin/*` | JWT + admin\|superadmin | Platform console |
