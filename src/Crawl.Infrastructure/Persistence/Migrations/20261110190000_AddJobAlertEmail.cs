@@ -1,3 +1,5 @@
+using Crawl.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -5,6 +7,10 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Crawl.Infrastructure.Persistence.Migrations
 {
     /// <inheritdoc />
+    /// Designer was missing so EF never discovered this migration on startup;
+    /// attribute on the Up class restores MigrateAsync application.
+    [DbContext(typeof(CrawlDbContext))]
+    [Migration("20261110190000_AddJobAlertEmail")]
     public partial class AddJobAlertEmail : Migration
     {
         /// <inheritdoc />
